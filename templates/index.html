@@ -1,0 +1,2892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ice Line Employee Scheduler</title>
+    <style>
+        /* === BASE STYLES === */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Calibri, Arial, sans-serif;
+            background: #f0f0f0;
+            padding: 20px;
+            color: #000;
+        }
+
+        /* === SCHEDULE CONTAINER === */
+        .schedule-container {
+            background: white;
+            overflow-x: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+        }
+
+        /* === SCHEDULE TABLE === */
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1100px;
+            font-size: 11pt;
+        }
+
+        .schedule-table th,
+        .schedule-table td {
+            border: 1px solid #a0a0a0;
+            padding: 6px 8px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        /* === TITLE ROW === */
+        .title-row td {
+            background: linear-gradient(135deg, #1a5276 0%, #2471a3 100%);
+            color: white;
+            font-size: 16pt;
+            font-weight: 600;
+            padding: 14px;
+            text-align: center;
+            border: none;
+            letter-spacing: 0.5px;
+            position: relative;
+        }
+
+        /* === VIEW TOGGLE === */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .view-label {
+            font-size: 10pt;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .view-toggle {
+            display: flex;
+            background: #e0e0e0;
+            border-radius: 6px;
+            padding: 3px;
+            gap: 2px;
+        }
+
+        .view-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 10pt;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: transparent;
+            color: #666;
+        }
+
+        .view-btn.active {
+            background: white;
+            color: #1a5276;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        }
+
+        .view-btn:not(.active):hover {
+            background: rgba(255,255,255,0.5);
+        }
+
+        /* === WEEK NAVIGATION === */
+        .week-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .week-nav-btn {
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            font-size: 14pt;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #666;
+        }
+
+        .week-nav-btn:hover {
+            border-color: #2471a3;
+            color: #2471a3;
+        }
+
+        .week-display {
+            font-size: 11pt;
+            font-weight: 600;
+            color: #333;
+            min-width: 180px;
+            text-align: center;
+        }
+
+        /* === ACTION BUTTONS === */
+        .action-btn {
+            padding: 8px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            font-size: 10pt;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .action-btn:hover {
+            border-color: #2471a3;
+            background: #f0f7fc;
+        }
+
+        .action-btn.primary {
+            background: #2471a3;
+            border-color: #2471a3;
+            color: white;
+        }
+
+        .action-btn.primary:hover {
+            background: #1a5276;
+            border-color: #1a5276;
+        }
+
+        .action-btn .icon {
+            font-size: 12pt;
+        }
+
+        /* === SAVE STATUS === */
+        .save-status {
+            font-size: 9pt;
+            color: #666;
+            padding: 6px 12px;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+
+        .save-status.saved {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .save-status.unsaved {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        /* === OVERTIME WARNING === */
+        .hours-cell.overtime {
+            background: #f8d7da !important;
+            color: #721c24;
+        }
+
+        .employee-row.manager .hours-cell.overtime {
+            background: #f8d7da !important;
+        }
+
+        .employee-row.zak .hours-cell.overtime {
+            background: #f8d7da !important;
+        }
+
+        /* === INLINE SHIFT INPUT === */
+        .shift-cell {
+            position: relative;
+            padding: 2px 4px !important;
+        }
+
+        .shift-input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            text-align: center;
+            font-size: 10pt;
+            font-family: inherit;
+            padding: 4px 2px;
+            outline: none;
+        }
+
+        .shift-input:focus {
+            background: #fff;
+            border: 1px solid #2471a3;
+            border-radius: 3px;
+        }
+
+        .shift-input::placeholder {
+            color: #ccc;
+        }
+
+        .shift-popup-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 16px;
+            height: 16px;
+            padding: 0;
+            border: none;
+            background: #e0e0e0;
+            border-radius: 3px;
+            font-size: 9px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .shift-cell:hover .shift-popup-btn {
+            opacity: 0.7;
+        }
+
+        .shift-popup-btn:hover {
+            opacity: 1 !important;
+            background: #2471a3;
+            color: white;
+        }
+
+        body.employee-view .shift-input {
+            pointer-events: none;
+        }
+
+        body.employee-view .shift-popup-btn {
+            display: none;
+        }
+
+        /* === DRAG AND DROP === */
+        .drag-handle {
+            cursor: grab;
+            padding: 0 6px;
+            color: #999;
+            font-size: 14px;
+            user-select: none;
+        }
+
+        .drag-handle:hover {
+            color: #666;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .employee-row.dragging {
+            opacity: 0.5;
+            background: #e3f2fd !important;
+        }
+
+        .employee-row.dragging td {
+            background: #e3f2fd !important;
+        }
+
+        .employee-row.drag-over {
+            border-top: 3px solid #2471a3 !important;
+        }
+
+        .employee-row.drag-over-bottom {
+            border-bottom: 3px solid #2471a3 !important;
+        }
+
+        body.employee-view .drag-handle {
+            display: none;
+        }
+
+        /* === EMPLOYEE VIEW STYLES === */
+        body.employee-view .shift-cell {
+            cursor: default;
+        }
+
+        body.employee-view .shift-cell:hover {
+            background: inherit;
+        }
+
+        body.employee-view .employee-row.manager td.shift-cell:hover {
+            background: #FFFF00;
+        }
+
+        body.employee-view .employee-row.manager td.shift-cell.weekend:hover {
+            background: #fff9c4;
+        }
+
+        body.employee-view .employee-row.zak td.shift-cell:hover {
+            background: #92D050;
+        }
+
+        body.employee-view .employee-row.zak td.shift-cell.weekend:hover {
+            background: #a8d86a;
+        }
+
+        body.employee-view .employee-row.staff td.shift-cell:hover {
+            background: #ffffff;
+        }
+
+        body.employee-view .employee-row.staff td.shift-cell.weekend:hover {
+            background: #fffef0;
+        }
+
+        body.employee-view .hours-cell,
+        body.employee-view .hours-header {
+            display: none;
+        }
+
+        body.employee-view .legend {
+            display: none;
+        }
+
+        body.employee-view .toolbar-left .action-btn,
+        body.employee-view .save-status {
+            display: none;
+        }
+
+        /* Print-friendly employee view indicator */
+        .view-indicator {
+            display: none;
+            text-align: center;
+            padding: 8px;
+            background: #f0f0f0;
+            font-size: 9pt;
+            color: #666;
+            border-radius: 0 0 8px 8px;
+        }
+
+        body.employee-view .view-indicator {
+            display: block;
+        }
+
+        /* === PRINT STYLES === */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+
+            .toolbar, .legend, .view-indicator {
+                display: none !important;
+            }
+
+            .schedule-container {
+                box-shadow: none;
+                border-radius: 0;
+            }
+
+            .schedule-table {
+                font-size: 9pt;
+                min-width: auto;
+            }
+
+            .schedule-table th,
+            .schedule-table td {
+                padding: 4px 6px;
+            }
+
+            .title-row td {
+                background: #333 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .employee-row.manager td,
+            .office-hours-row td,
+            .events-row td:first-child {
+                background: #FFFF00 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .employee-row.zak td,
+            .notice-row .warning {
+                background: #92D050 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .day-header-row th,
+            .inout-header-row th {
+                background: #d5d8dc !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .hours-cell, .hours-header {
+                display: none !important;
+            }
+
+            .employee-row td:first-child {
+                position: static;
+            }
+
+            .office-hours-row td:first-child,
+            .events-row td:first-child {
+                position: static;
+            }
+
+            .shift-input {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+            }
+
+            .shift-popup-btn {
+                display: none !important;
+            }
+        }
+
+        /* === EDITABLE CELLS === */
+        .office-hours-row td:not(:first-child):not(:last-child) {
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+
+        .office-hours-row td:not(:first-child):not(:last-child):hover {
+            background: #fff59d !important;
+        }
+
+        .events-row td:not(:first-child):not(:last-child) {
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+
+        .events-row td:not(:first-child):not(:last-child):hover {
+            background: #e3f2fd !important;
+        }
+
+        body.employee-view .office-hours-row td:not(:first-child):hover,
+        body.employee-view .events-row td:not(:first-child):hover {
+            background: inherit !important;
+            cursor: default;
+        }
+
+        /* === EMPLOYEE MANAGEMENT === */
+        .employee-row td:first-child {
+            position: relative;
+        }
+
+        .employee-actions {
+            display: none;
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            gap: 4px;
+        }
+
+        .employee-row:hover .employee-actions {
+            display: flex;
+        }
+
+        body.employee-view .employee-actions {
+            display: none !important;
+        }
+
+        .emp-action-btn {
+            width: 22px;
+            height: 22px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+
+        .emp-action-btn.edit {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .emp-action-btn.edit:hover {
+            background: #bbdefb;
+        }
+
+        .emp-action-btn.delete {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .emp-action-btn.delete:hover {
+            background: #ffcdd2;
+        }
+
+        /* === ADD EMPLOYEE BUTTON === */
+        .add-employee-row td {
+            background: #f8f9fa;
+            border-style: dashed;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .add-employee-row td:hover {
+            background: #e8f4fc;
+        }
+
+        .add-employee-row .add-btn {
+            color: #666;
+            font-size: 10pt;
+        }
+
+        body.employee-view .add-employee-row {
+            display: none;
+        }
+
+        /* === COVERAGE VIEW === */
+        .coverage-container {
+            margin-top: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+            padding: 20px;
+        }
+
+        .coverage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .coverage-header h3 {
+            font-size: 14pt;
+            color: #333;
+            margin: 0;
+        }
+
+        .coverage-toggle {
+            padding: 6px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            font-size: 9pt;
+            cursor: pointer;
+        }
+
+        .coverage-toggle:hover {
+            border-color: #2471a3;
+        }
+
+        .coverage-grid {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            gap: 1px;
+            background: #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .coverage-cell {
+            padding: 8px 4px;
+            text-align: center;
+            font-size: 9pt;
+            background: white;
+        }
+
+        .coverage-cell.header {
+            background: #d5d8dc;
+            font-weight: 600;
+        }
+
+        .coverage-cell.time-label {
+            background: #f8f9fa;
+            font-weight: 500;
+            text-align: right;
+            padding-right: 8px;
+        }
+
+        .coverage-cell.level-0 { background: #ffebee; color: #c62828; }
+        .coverage-cell.level-1 { background: #fff3e0; color: #e65100; }
+        .coverage-cell.level-2 { background: #fffde7; color: #f9a825; }
+        .coverage-cell.level-3 { background: #e8f5e9; color: #2e7d32; }
+        .coverage-cell.level-4 { background: #c8e6c9; color: #1b5e20; }
+        .coverage-cell.level-5 { background: #a5d6a7; color: #1b5e20; }
+
+        body.employee-view .coverage-container {
+            display: none;
+        }
+
+        /* === MODAL IMPROVEMENTS === */
+        .modal-body .form-group.full-width {
+            flex: none;
+            width: 100%;
+        }
+
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 11pt;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #2471a3;
+        }
+
+        .section-select {
+            margin-bottom: 16px;
+        }
+
+        .section-select label {
+            display: block;
+            font-size: 9pt;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .section-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .section-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            font-size: 10pt;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .section-btn:hover {
+            border-color: #2471a3;
+        }
+
+        .section-btn.active {
+            border-color: #2471a3;
+            background: #e8f4fc;
+        }
+
+        .section-btn.manager { border-left: 4px solid #FFFF00; }
+        .section-btn.zak { border-left: 4px solid #92D050; }
+        .section-btn.staff { border-left: 4px solid #dee2e6; }
+
+        /* === DAY HEADER ROW === */
+        .day-header-row th {
+            background: #d5d8dc;
+            font-weight: 600;
+            font-size: 11pt;
+            padding: 8px 4px 4px 4px;
+        }
+
+        .day-header-row th.weekend {
+            background: #f9e79f;
+        }
+
+        .day-header-row .day-name {
+            font-size: 11pt;
+            font-weight: 700;
+        }
+
+        .day-header-row .day-date {
+            font-size: 9pt;
+            color: #555;
+            font-weight: normal;
+        }
+
+        /* First column header */
+        .day-header-row th:first-child {
+            background: #d5d8dc;
+        }
+
+        /* === IN/OUT HEADER ROW === */
+        .inout-header-row th {
+            background: #e5e7e9;
+            font-weight: 500;
+            font-size: 9pt;
+            padding: 4px;
+            color: #555;
+        }
+
+        .inout-header-row th.weekend {
+            background: #fcf3cf;
+        }
+
+        /* Hours column header */
+        .inout-header-row th.hours-header,
+        .day-header-row th.hours-header {
+            background: #d5d8dc;
+            font-weight: 600;
+        }
+
+        /* === SECTION DIVIDER === */
+        .section-divider td {
+            height: 8px;
+            background: linear-gradient(to right, #e0e0e0, #f5f5f5, #e0e0e0);
+            border: none;
+            border-top: 2px solid #c0c0c0;
+        }
+
+        /* === EMPLOYEE ROWS === */
+        .employee-row td {
+            height: 38px;
+            transition: background-color 0.15s;
+        }
+
+        .employee-row td:first-child {
+            text-align: left;
+            white-space: nowrap;
+            min-width: 180px;
+            position: sticky;
+            left: 0;
+            z-index: 1;
+        }
+
+        .employee-name {
+            display: block;
+            font-weight: 600;
+            font-size: 10.5pt;
+        }
+
+        .employee-phone {
+            display: block;
+            color: #555;
+            font-weight: normal;
+            font-size: 9pt;
+            margin-top: 1px;
+        }
+
+        /* === MANAGER ROWS (yellow) === */
+        .employee-row.manager td {
+            background: #FFFF00;
+        }
+
+        .employee-row.manager td:first-child {
+            background: #FFFF00;
+            border-right: 2px solid #cccc00;
+        }
+
+        .employee-row.manager td.shift-cell:hover {
+            background: #ffffaa;
+        }
+
+        .employee-row.manager td.weekend {
+            background: #fff9c4;
+        }
+
+        /* === ZAK ROW (green) === */
+        .employee-row.zak td {
+            background: #92D050;
+        }
+
+        .employee-row.zak td:first-child {
+            background: #92D050;
+            border-right: 2px solid #6ba83a;
+        }
+
+        .employee-row.zak td.shift-cell:hover {
+            background: #b8e08a;
+        }
+
+        .employee-row.zak td.weekend {
+            background: #a8d86a;
+        }
+
+        /* === STAFF ROWS (white) === */
+        .employee-row.staff td {
+            background: #ffffff;
+        }
+
+        .employee-row.staff td:first-child {
+            background: #f8f9fa;
+            border-right: 2px solid #dee2e6;
+        }
+
+        .employee-row.staff td.shift-cell:hover {
+            background: #e8f4fc;
+        }
+
+        .employee-row.staff td.weekend {
+            background: #fffef0;
+        }
+
+        .employee-row.staff:nth-child(even) td:not(:first-child):not(.weekend) {
+            background: #fafafa;
+        }
+
+        /* Shift cells */
+        .shift-cell {
+            min-width: 58px;
+            cursor: pointer;
+            font-size: 10pt;
+        }
+
+        /* Hours total column */
+        .hours-cell {
+            font-weight: 600;
+            background: #f0f0f0 !important;
+            min-width: 50px;
+            font-size: 10pt;
+        }
+
+        .employee-row.manager .hours-cell {
+            background: #fff59d !important;
+        }
+
+        .employee-row.zak .hours-cell {
+            background: #c5e1a5 !important;
+        }
+
+        /* === SPACER ROW === */
+        .spacer-row td {
+            height: 12px;
+            background: #f5f5f5;
+            border: none;
+        }
+
+        /* === OFFICE HOURS ROW (yellow) === */
+        .office-hours-row td {
+            background: #FFFF00;
+            font-weight: 600;
+            font-size: 10pt;
+        }
+
+        .office-hours-row td:first-child {
+            text-align: left;
+            position: sticky;
+            left: 0;
+            z-index: 1;
+        }
+
+        .office-hours-row td.weekend {
+            background: #fff9c4;
+        }
+
+        /* === NOTICE ROW === */
+        .notice-row td {
+            background: #f8f9fa;
+            font-size: 9pt;
+            color: #333;
+            text-align: left;
+            padding: 10px 12px;
+            border: none;
+        }
+
+        .notice-row .hours-note {
+            color: #666;
+            font-style: italic;
+        }
+
+        .notice-row .warning {
+            background: #92D050;
+            color: #c0392b;
+            font-weight: 700;
+            font-style: italic;
+            padding: 6px 14px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-left: 20px;
+            text-transform: uppercase;
+            font-size: 9pt;
+            letter-spacing: 0.3px;
+        }
+
+        /* === EVENTS ROW === */
+        .events-row td {
+            background: #ffffff;
+            font-size: 10pt;
+            vertical-align: middle;
+            padding: 10px 6px;
+        }
+
+        .events-row td:first-child {
+            text-align: left;
+            font-weight: 700;
+            background: #FFFF00;
+            position: sticky;
+            left: 0;
+            z-index: 1;
+        }
+
+        .events-row td.weekend {
+            background: #fffef0;
+        }
+
+        .event-tag {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 9pt;
+            font-weight: 500;
+            margin: 2px;
+        }
+
+        .event-tag.closed {
+            background: #e74c3c;
+        }
+
+        .event-tag.tournament {
+            background: #9b59b6;
+        }
+
+        /* === LEGEND === */
+        .legend {
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            gap: 24px;
+            font-size: 10pt;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 18px;
+            height: 18px;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+        }
+
+        .legend-color.manager { background: #FFFF00; }
+        .legend-color.zak { background: #92D050; }
+        .legend-color.staff { background: #ffffff; }
+        .legend-color.weekend { background: #fffef0; border-color: #f0e68c; }
+
+        /* === MODAL OVERLAY === */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        /* === MODAL BOX === */
+        .modal {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #1a5276 0%, #2471a3 100%);
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 14pt;
+            font-weight: 600;
+        }
+
+        .modal-header .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            opacity: 0.8;
+        }
+
+        .modal-header .close-btn:hover {
+            opacity: 1;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-employee {
+            font-size: 12pt;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .modal-day {
+            font-size: 10pt;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        /* === FORM FIELDS === */
+        .form-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 9pt;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 11pt;
+            transition: border-color 0.2s;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #2471a3;
+        }
+
+        /* === QUICK ACTIONS === */
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .quick-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: #f8f9fa;
+            font-size: 10pt;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-btn:hover {
+            border-color: #2471a3;
+            background: #e8f4fc;
+        }
+
+        .quick-btn.off {
+            border-color: #f0e68c;
+            background: #fffef0;
+        }
+
+        .quick-btn.off:hover {
+            border-color: #d4ac0d;
+            background: #fff9c4;
+        }
+
+        .quick-btn.clear {
+            border-color: #f5b7b1;
+            background: #fdedec;
+        }
+
+        .quick-btn.clear:hover {
+            border-color: #e74c3c;
+            background: #f9e0de;
+        }
+
+        /* === MODAL FOOTER === */
+        .modal-footer {
+            padding: 16px 20px;
+            background: #f8f9fa;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 24px;
+            border-radius: 6px;
+            font-size: 10pt;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-cancel {
+            background: white;
+            border: 2px solid #e0e0e0;
+            color: #666;
+        }
+
+        .btn-cancel:hover {
+            border-color: #c0c0c0;
+            background: #f0f0f0;
+        }
+
+        .btn-save {
+            background: #2471a3;
+            border: 2px solid #2471a3;
+            color: white;
+        }
+
+        .btn-save:hover {
+            background: #1a5276;
+            border-color: #1a5276;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script>
+        // ============================================================
+        // DATA
+        // ============================================================
+
+        const scheduleData = {
+            weekTitle: "December 24th, 2025",
+            weekStart: "2024-12-23", // Monday of the week
+            
+            days: [
+                { name: "Wed", date: "12/24" },
+                { name: "Thurs", date: "12/25" },
+                { name: "Fri", date: "12/26" },
+                { name: "Sat", date: "12/27", isWeekend: true },
+                { name: "Sun", date: "12/28", isWeekend: true },
+                { name: "Mon", date: "12/29" },
+                { name: "Tues", date: "12/30" }
+            ],
+            
+            managers: [
+                {
+                    name: "Bob Adams",
+                    phone: "610-505-6322",
+                    shifts: [
+                        null,
+                        { in: "-", out: "-" },
+                        { in: "8:00 AM", out: "1:30 PM" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "8:00 AM", out: "4:00 PM" },
+                        { in: "8:00 AM", out: "4:00 PM" }
+                    ]
+                },
+                {
+                    name: "Dave Hendricks",
+                    phone: "484-459-8620",
+                    shifts: [
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "12:30 PM", out: "CLOSE" },
+                        { in: "12:00 PM", out: "CLOSE" },
+                        { in: "1:00 PM", out: "CLOSE" },
+                        { in: "12:30 PM", out: "CLOSE" },
+                        { in: "-", out: "-" }
+                    ]
+                }
+            ],
+            
+            zakReilly: {
+                name: "Zak Reilly",
+                phone: "267-247-2955",
+                shifts: [
+                    { in: "10:00 AM", out: "12:00 PM" },
+                    { in: "-", out: "-" },
+                    { in: "10:00 AM", out: "7:30 PM" },
+                    { in: "12:00 PM", out: "9:00 PM" },
+                    { in: "7:30 AM", out: "2:30 PM" },
+                    { in: "10:30 AM", out: "7:30 PM" },
+                    { in: "10:30 AM", out: "7:30 PM" }
+                ]
+            },
+            
+            employees: [
+                {
+                    name: "Ava Hawthorne",
+                    phone: "(267) 738-4698",
+                    shifts: [
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" }
+                    ]
+                },
+                {
+                    name: "Marisa Fullerton",
+                    phone: "(215) 252-6544",
+                    shifts: [
+                        { in: "8:30 AM", out: "2:00 PM" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "8:00 AM", out: "4:00 PM" },
+                        { in: "1:00 PM", out: "CLOSE" },
+                        { in: "12:30 PM", out: "CLOSE" },
+                        { in: "12:30 PM", out: "CLOSE" }
+                    ]
+                },
+                {
+                    name: "Nate Bailey",
+                    phone: "(609) 832-9499",
+                    shifts: [
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" }
+                    ]
+                },
+                {
+                    name: "Lilli Binns",
+                    phone: "",
+                    shifts: [
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "2:00 PM", out: "CLOSE" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" }
+                    ]
+                },
+                {
+                    name: "Olivia Binns",
+                    phone: "",
+                    shifts: [
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "12:00 PM", out: "5:00 PM" },
+                        { in: "1:00 PM", out: "9:00 PM" },
+                        { in: "7:30 AM", out: "3:00 PM" },
+                        { in: "12:30 PM", out: "CLOSE" },
+                        { in: "12:30 PM", out: "CLOSE" }
+                    ]
+                },
+                {
+                    name: "Hunter Haas",
+                    phone: "(484) 631-5469",
+                    shifts: [
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" }
+                    ]
+                },
+                {
+                    name: "Lena Sturz",
+                    phone: "",
+                    shifts: [
+                        { in: "-", out: "-" },
+                        { in: "-", out: "-" },
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                    ]
+                }
+            ],
+
+            officeHours: [
+                { in: "8:00 AM", out: "2:00 PM" },
+                { in: "CLOSED", out: "CLOSED" },
+                { in: "8:00 AM", out: "9:00 PM" },
+                { in: "8:00 AM", out: "9:00 PM" },
+                { in: "7:30 AM", out: "9:00 PM" },
+                { in: "8:00 AM", out: "9:00 PM" },
+                { in: "8:00 AM", out: "9:00 PM" }
+            ],
+
+            events: [
+                [],
+                ["CLOSED, MERRY CHRISTMAS"],
+                [],
+                ["FRIAR FACE OFF"],
+                ["FRIAR FACE OFF"],
+                ["FRIAR FACE OFF"],
+                []
+            ]
+        };
+
+
+        // ============================================================
+        // UTILITY FUNCTIONS
+        // ============================================================
+
+        function formatTime(timeStr) {
+            if (!timeStr || timeStr === "-" || timeStr === "CLOSE" || timeStr === "CLOSED") {
+                return timeStr || "";
+            }
+            return timeStr;
+        }
+
+        function parseTime(timeStr) {
+            if (!timeStr || timeStr === "-" || timeStr === "CLOSE" || timeStr === "CLOSED") {
+                return null;
+            }
+            
+            const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+            if (!match) return null;
+            
+            let hours = parseInt(match[1]);
+            const minutes = parseInt(match[2]);
+            const period = match[3].toUpperCase();
+            
+            if (period === 'PM' && hours !== 12) hours += 12;
+            if (period === 'AM' && hours === 12) hours = 0;
+            
+            return hours * 60 + minutes;
+        }
+
+        function calculateHours(shift, dayIndex) {
+            if (!shift || shift.in === "-") return 0;
+            
+            const startMins = parseTime(shift.in);
+            let endMins = parseTime(shift.out);
+            
+            // Handle CLOSE - use office hours close time
+            if (shift.out === "CLOSE") {
+                const officeClose = scheduleData.officeHours[dayIndex];
+                if (officeClose && officeClose.out !== "CLOSED") {
+                    endMins = parseTime(officeClose.out);
+                } else {
+                    endMins = parseTime("9:00 PM"); // Default close
+                }
+            }
+            
+            if (startMins === null || endMins === null) return 0;
+            return (endMins - startMins) / 60;
+        }
+
+        function calculateWeeklyHours(shifts) {
+            return shifts.reduce((total, shift, dayIndex) => {
+                return total + calculateHours(shift, dayIndex);
+            }, 0);
+        }
+
+
+        // ============================================================
+        // VIEW MODE & STATE
+        // ============================================================
+
+        const API_BASE = '';  // Same origin
+        let currentView = 'manager'; // 'manager' or 'employee'
+        let hasUnsavedChanges = false;
+        const OVERTIME_THRESHOLD = 40;
+        
+        // Current week start (Monday before the Wednesday) - will be set on load
+        let currentWeekStart = getWeekStart(new Date()).toISOString().split('T')[0];
+
+        function getWeekStart(date) {
+            // Find the Monday before the Wednesday that starts this schedule week
+            // Schedule runs Wed-Tues, so we store the Monday of that week
+            const d = new Date(date);
+            const day = d.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+            
+            // Calculate days to subtract to get to Monday
+            // If Wed(3), Thu(4), Fri(5), Sat(6) -> we're in the current Mon's week
+            // If Sun(0), Mon(1), Tue(2) -> we're still in the previous week's schedule
+            let daysToMonday;
+            if (day === 0) { // Sunday - go back 6 days to Monday
+                daysToMonday = 6;
+            } else if (day === 1) { // Monday - go back 7 days (this Monday is next week's schedule)
+                daysToMonday = 7;
+            } else if (day === 2) { // Tuesday - go back 8 days
+                daysToMonday = 8;
+            } else { // Wed-Sat - go back to this week's Monday
+                daysToMonday = day - 1;
+            }
+            
+            d.setDate(d.getDate() - daysToMonday);
+            return d;
+        }
+
+        function setView(view) {
+            currentView = view;
+            
+            if (view === 'employee') {
+                document.body.classList.add('employee-view');
+            } else {
+                document.body.classList.remove('employee-view');
+            }
+            
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === view);
+            });
+        }
+
+        function markUnsaved() {
+            hasUnsavedChanges = true;
+            updateSaveStatus();
+        }
+
+        function updateSaveStatus() {
+            const statusEl = document.querySelector('.save-status');
+            if (statusEl) {
+                if (hasUnsavedChanges) {
+                    statusEl.textContent = '● Unsaved changes';
+                    statusEl.className = 'save-status unsaved';
+                } else {
+                    statusEl.textContent = '✓ Saved';
+                    statusEl.className = 'save-status saved';
+                }
+            }
+        }
+
+
+        // ============================================================
+        // API FUNCTIONS
+        // ============================================================
+
+        async function loadSchedule(weekStart) {
+            try {
+                const response = await fetch(`${API_BASE}/api/schedule/${weekStart}`);
+                if (!response.ok) throw new Error('Failed to load schedule');
+                
+                const data = await response.json();
+                
+                // Update scheduleData with response
+                scheduleData.weekTitle = data.weekTitle;
+                scheduleData.weekStart = data.weekStart;
+                scheduleData.days = data.days;
+                scheduleData.managers = data.managers;
+                scheduleData.zakReilly = data.zakReilly;
+                scheduleData.employees = data.employees;
+                scheduleData.officeHours = data.officeHours;
+                scheduleData.events = data.events;
+                
+                currentWeekStart = weekStart;
+                hasUnsavedChanges = false;
+                
+                console.log('Schedule loaded for week:', weekStart);
+                return true;
+            } catch (error) {
+                console.error('Error loading schedule:', error);
+                return false;
+            }
+        }
+
+        async function saveToStorage() {
+            try {
+                // Build shifts array from current data
+                const shifts = [];
+                
+                // Collect all shifts from all employees
+                const allEmployees = [
+                    ...scheduleData.managers,
+                    scheduleData.zakReilly,
+                    ...scheduleData.employees
+                ].filter(e => e);
+                
+                allEmployees.forEach(emp => {
+                    emp.shifts.forEach((shift, dayIndex) => {
+                        if (shift && (shift.in || shift.out)) {
+                            shifts.push({
+                                employee_id: emp.id,
+                                day_index: dayIndex,
+                                in: shift.in,
+                                out: shift.out
+                            });
+                        }
+                    });
+                });
+                
+                const payload = {
+                    shifts: shifts,
+                    officeHours: scheduleData.officeHours,
+                    events: scheduleData.events
+                };
+                
+                const response = await fetch(`${API_BASE}/api/schedule/${currentWeekStart}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) throw new Error('Failed to save schedule');
+                
+                hasUnsavedChanges = false;
+                updateSaveStatus();
+                console.log('Schedule saved for week:', currentWeekStart);
+                
+            } catch (error) {
+                console.error('Error saving schedule:', error);
+                alert('Failed to save schedule. Please try again.');
+            }
+        }
+
+        async function updateSingleShift(employeeId, dayIndex, timeIn, timeOut) {
+            try {
+                const response = await fetch(`${API_BASE}/api/schedule/${currentWeekStart}/shift`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        employee_id: employeeId,
+                        day_index: dayIndex,
+                        in: timeIn,
+                        out: timeOut
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Failed to update shift');
+                return true;
+            } catch (error) {
+                console.error('Error updating shift:', error);
+                return false;
+            }
+        }
+
+        function loadFromStorage(weekKey) {
+            // This is now handled by loadSchedule()
+            return false;
+        }
+
+        function getWeekKey(date) {
+            return getWeekStart(date).toISOString().split('T')[0];
+        }
+
+
+        // ============================================================
+        // WEEK NAVIGATION
+        // ============================================================
+
+        async function navigateWeek(direction) {
+            // Check for unsaved changes
+            if (hasUnsavedChanges) {
+                if (!confirm('You have unsaved changes. Do you want to continue without saving?')) {
+                    return;
+                }
+            }
+            
+            // Calculate new week start
+            const current = new Date(currentWeekStart);
+            current.setDate(current.getDate() + (direction * 7));
+            const newWeekStart = current.toISOString().split('T')[0];
+            
+            // Load from API
+            await loadSchedule(newWeekStart);
+            
+            renderSchedule();
+            setupEventListeners();
+        }
+
+        function createBlankWeek(startDate) {
+            // Not needed anymore - API handles creating blank weeks
+        }
+
+        function formatWeekTitle(date) {
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                           'July', 'August', 'September', 'October', 'November', 'December'];
+            const day = date.getDate();
+            const suffix = (day === 1 || day === 21 || day === 31) ? 'st' : 
+                          (day === 2 || day === 22) ? 'nd' : 
+                          (day === 3 || day === 23) ? 'rd' : 'th';
+            return `${months[date.getMonth()]} ${day}${suffix}, ${date.getFullYear()}`;
+        }
+
+        async function copyPreviousWeek() {
+            // Get previous week's key
+            const current = new Date(currentWeekStart);
+            current.setDate(current.getDate() - 7);
+            const prevWeekKey = current.toISOString().split('T')[0];
+            
+            if (!confirm('This will copy shifts from the previous week. Continue?')) {
+                return;
+            }
+            
+            try {
+                // Load previous week's data
+                const response = await fetch(`${API_BASE}/api/schedule/${prevWeekKey}`);
+                if (!response.ok) {
+                    alert('No schedule found for the previous week.');
+                    return;
+                }
+                
+                const prev = await response.json();
+                
+                // Copy shifts to current week (keeping current dates)
+                scheduleData.managers.forEach((emp, i) => {
+                    if (prev.managers[i]) {
+                        emp.shifts = JSON.parse(JSON.stringify(prev.managers[i].shifts));
+                    }
+                });
+                
+                if (prev.zakReilly) {
+                    scheduleData.zakReilly.shifts = JSON.parse(JSON.stringify(prev.zakReilly.shifts));
+                }
+                
+                scheduleData.employees.forEach((emp, i) => {
+                    if (prev.employees[i]) {
+                        emp.shifts = JSON.parse(JSON.stringify(prev.employees[i].shifts));
+                    }
+                });
+                
+                scheduleData.officeHours = JSON.parse(JSON.stringify(prev.officeHours));
+                scheduleData.events = [[], [], [], [], [], [], []];
+                
+                markUnsaved();
+                renderSchedule();
+                setupEventListeners();
+                
+            } catch (error) {
+                console.error('Error copying previous week:', error);
+                alert('Failed to copy previous week.');
+            }
+        }
+
+
+        // ============================================================
+        // RENDER FUNCTIONS
+        // ============================================================
+
+        function renderSchedule() {
+            const app = document.getElementById('app');
+            
+            app.innerHTML = `
+                ${renderToolbar()}
+                <div class="schedule-container">
+                    <table class="schedule-table">
+                        ${renderTitleRow()}
+                        ${renderDayHeaderRow()}
+                        ${renderInOutHeaderRow()}
+                        ${renderEmployeeRows()}
+                        ${renderSectionDivider()}
+                        ${renderOfficeHoursRow()}
+                        ${renderNoticeRow()}
+                        ${renderEventsRow()}
+                    </table>
+                    <div class="view-indicator">Employee Schedule View</div>
+                </div>
+                ${renderLegend()}
+                <div class="coverage-container" id="coverageContainer" style="display: none;">
+                    ${renderCoverageView()}
+                </div>
+            `;
+            
+            setView(currentView);
+            updateSaveStatus();
+        }
+
+        function renderToolbar() {
+            return `
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <div class="week-nav">
+                            <button class="week-nav-btn" onclick="navigateWeek(-1)" title="Previous Week">◀</button>
+                            <span class="week-display">Week of ${scheduleData.weekTitle}</span>
+                            <button class="week-nav-btn" onclick="navigateWeek(1)" title="Next Week">▶</button>
+                        </div>
+                        <button class="action-btn" onclick="copyPreviousWeek()">
+                            <span class="icon">📋</span> Copy Previous Week
+                        </button>
+                        <button class="action-btn primary" onclick="saveToStorage()">
+                            <span class="icon">💾</span> Save
+                        </button>
+                        <span class="save-status">✓ Saved</span>
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="action-btn" onclick="exportToExcel()">
+                            <span class="icon">📊</span> Export Excel
+                        </button>
+                        <button class="action-btn" onclick="window.print()">
+                            <span class="icon">🖨️</span> Print
+                        </button>
+                        <button class="action-btn" onclick="toggleCoverage()">
+                            <span class="icon">📈</span> Coverage
+                        </button>
+                        <span class="view-label">View:</span>
+                        <div class="view-toggle">
+                            <button class="view-btn active" data-view="manager" onclick="setView('manager')">Manager</button>
+                            <button class="view-btn" data-view="employee" onclick="setView('employee')">Employee</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderViewToggle() {
+            return `
+                <div class="view-toggle-container">
+                    <span class="view-label">View:</span>
+                    <div class="view-toggle">
+                        <button class="view-btn active" data-view="manager" onclick="setView('manager')">Manager</button>
+                        <button class="view-btn" data-view="employee" onclick="setView('employee')">Employee</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTitleRow() {
+            const colSpan = 2 + (scheduleData.days.length * 2); // employee col + hours col + (in/out for each day)
+            return `
+                <tr class="title-row">
+                    <td colspan="${colSpan}">Ice Line Office Schedule — Week of ${scheduleData.weekTitle}</td>
+                </tr>
+            `;
+        }
+
+        function renderDayHeaderRow() {
+            let html = '<tr class="day-header-row"><th>Employee</th>';
+            
+            scheduleData.days.forEach(day => {
+                const weekendClass = day.isWeekend ? 'weekend' : '';
+                html += `
+                    <th colspan="2" class="${weekendClass}">
+                        <div class="day-name">${day.name}</div>
+                        <div class="day-date">${day.date}</div>
+                    </th>
+                `;
+            });
+            
+            html += '<th class="hours-header">Hours</th>';
+            html += '</tr>';
+            return html;
+        }
+
+        function renderInOutHeaderRow() {
+            let html = '<tr class="inout-header-row"><th></th>';
+            
+            scheduleData.days.forEach(day => {
+                const weekendClass = day.isWeekend ? 'weekend' : '';
+                html += `<th class="${weekendClass}">In</th><th class="${weekendClass}">Out</th>`;
+            });
+            
+            html += '<th class="hours-header"></th>';
+            html += '</tr>';
+            return html;
+        }
+
+        function renderEmployeeRows() {
+            let html = '';
+            
+            // Managers
+            scheduleData.managers.forEach((emp, idx) => {
+                html += renderSingleEmployeeRow(emp, 'manager', idx);
+            });
+            
+            // Section divider before Zak
+            html += renderSectionDivider();
+            
+            // Zak
+            html += renderSingleEmployeeRow(scheduleData.zakReilly, 'zak', 0);
+            
+            // Section divider before staff
+            html += renderSectionDivider();
+            
+            // Staff
+            scheduleData.employees.forEach((emp, idx) => {
+                html += renderSingleEmployeeRow(emp, 'staff', idx);
+            });
+            
+            // Add employee button
+            html += renderAddEmployeeRow();
+            
+            return html;
+        }
+
+        function renderSectionDivider() {
+            const colSpan = 2 + (scheduleData.days.length * 2);
+            return `<tr class="section-divider"><td colspan="${colSpan}"></td></tr>`;
+        }
+
+        function renderSingleEmployeeRow(emp, section, empIndex) {
+            const draggable = section === 'staff' ? 'draggable="true"' : '';
+            let html = `<tr class="employee-row ${section}" ${draggable} data-section="${section}" data-index="${empIndex}">`;
+            
+            // Employee name and phone with action buttons
+            html += `
+                <td>
+                    ${section === 'staff' ? '<span class="drag-handle" title="Drag to reorder">☰</span>' : ''}
+                    <span class="employee-name">${emp.name}</span>
+                    ${emp.phone ? `<span class="employee-phone">${emp.phone}</span>` : ''}
+                    <div class="employee-actions">
+                        <button class="emp-action-btn edit" onclick="openEmployeeModal('${section}', ${empIndex})" title="Edit">✎</button>
+                        ${section === 'staff' ? `<button class="emp-action-btn delete" onclick="deleteEmployee(${empIndex})" title="Delete">✕</button>` : ''}
+                    </div>
+                </td>
+            `;
+            
+            // Shifts for each day
+            emp.shifts.forEach((shift, dayIndex) => {
+                const isWeekend = scheduleData.days[dayIndex].isWeekend;
+                const weekendClass = isWeekend ? 'weekend' : '';
+                
+                const inVal = shift ? (shift.in === '-' ? '-' : formatTime(shift.in) || '') : '';
+                const outVal = shift ? (shift.out === '-' ? '-' : formatTime(shift.out) || '') : '';
+                
+                // In cell
+                html += `<td class="shift-cell ${weekendClass}" data-section="${section}" data-emp="${empIndex}" data-day="${dayIndex}" data-type="in">
+                    <input type="text" class="shift-input" value="${inVal}" 
+                           onchange="handleShiftInput(this, '${section}', ${empIndex}, ${dayIndex}, 'in')"
+                           onclick="event.stopPropagation()"
+                           placeholder="—">
+                    <button class="shift-popup-btn" onclick="openShiftModal('${section}', ${empIndex}, ${dayIndex})" title="More options">⚙</button>
+                </td>`;
+                
+                // Out cell
+                html += `<td class="shift-cell ${weekendClass}" data-section="${section}" data-emp="${empIndex}" data-day="${dayIndex}" data-type="out">
+                    <input type="text" class="shift-input" value="${outVal}"
+                           onchange="handleShiftInput(this, '${section}', ${empIndex}, ${dayIndex}, 'out')"
+                           onclick="event.stopPropagation()"
+                           placeholder="—">
+                </td>`;
+            });
+            
+            // Hours total with overtime warning
+            const totalHours = calculateWeeklyHours(emp.shifts);
+            const overtimeClass = totalHours > OVERTIME_THRESHOLD ? 'overtime' : '';
+            html += `<td class="hours-cell ${overtimeClass}">${totalHours > 0 ? totalHours.toFixed(1) : '-'}</td>`;
+            
+            html += '</tr>';
+            return html;
+        }
+
+        function renderAddEmployeeRow() {
+            const colSpan = 2 + (scheduleData.days.length * 2);
+            return `
+                <tr class="add-employee-row" onclick="openAddEmployeeModal()">
+                    <td colspan="${colSpan}">
+                        <span class="add-btn">+ Add Employee</span>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function renderOfficeHoursRow() {
+            let html = '<tr class="office-hours-row">';
+            html += '<td>Front Office Hours*</td>';
+            
+            scheduleData.officeHours.forEach((hours, dayIndex) => {
+                const isWeekend = scheduleData.days[dayIndex].isWeekend;
+                const weekendClass = isWeekend ? 'weekend' : '';
+                
+                if (hours.in === "CLOSED") {
+                    html += `<td colspan="2" class="${weekendClass}" onclick="openOfficeHoursModal(${dayIndex})">CLOSED</td>`;
+                } else {
+                    html += `<td class="${weekendClass}" onclick="openOfficeHoursModal(${dayIndex})">${hours.in}</td>`;
+                    html += `<td class="${weekendClass}" onclick="openOfficeHoursModal(${dayIndex})">${hours.out}</td>`;
+                }
+            });
+            
+            html += '<td></td>';
+            html += '</tr>';
+            return html;
+        }
+
+        function renderNoticeRow() {
+            const colSpan = 2 + (scheduleData.days.length * 2);
+            return `
+                <tr class="notice-row">
+                    <td colspan="${colSpan}">
+                        <span class="hours-note">* Hours are subject to change</span>
+                        <span class="warning">If unable to work a scheduled shift you must find a replacement</span>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function renderEventsRow() {
+            let html = '<tr class="events-row">';
+            html += '<td>Special Events:</td>';
+            
+            scheduleData.events.forEach((dayEvents, dayIndex) => {
+                const isWeekend = scheduleData.days[dayIndex].isWeekend;
+                const weekendClass = isWeekend ? 'weekend' : '';
+                
+                let content = '';
+                if (dayEvents.length > 0) {
+                    content = dayEvents.map(evt => {
+                        let tagClass = 'event-tag';
+                        if (evt.toLowerCase().includes('closed')) tagClass += ' closed';
+                        else if (evt.toLowerCase().includes('tournament') || evt.toLowerCase().includes('face off')) tagClass += ' tournament';
+                        return `<span class="${tagClass}">${evt}</span>`;
+                    }).join('');
+                } else {
+                    content = '<span style="color: #ccc; font-size: 9pt;">+ Add event</span>';
+                }
+                
+                html += `<td colspan="2" class="${weekendClass}" onclick="openEventsModal(${dayIndex})">${content}</td>`;
+            });
+            
+            html += '<td></td>';
+            html += '</tr>';
+            return html;
+        }
+
+        function renderLegend() {
+            return `
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color manager"></div>
+                        <span>Managers</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color zak"></div>
+                        <span>Zak Reilly</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color staff"></div>
+                        <span>Staff</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color weekend"></div>
+                        <span>Weekend</span>
+                    </div>
+                </div>
+            `;
+        }
+
+
+        // ============================================================
+        // INITIALIZATION
+        // ============================================================
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Get current week from backend (Python calendar is source of truth)
+            try {
+                const response = await fetch(`${API_BASE}/api/current-week`);
+                const data = await response.json();
+                currentWeekStart = data.weekStart;
+                console.log('Current week from server:', data);
+            } catch (error) {
+                console.error('Failed to get current week, using fallback:', error);
+                currentWeekStart = getWeekStart(new Date()).toISOString().split('T')[0];
+            }
+            
+            // Load schedule from API
+            await loadSchedule(currentWeekStart);
+            
+            renderSchedule();
+            setupEventListeners();
+            console.log('Schedule loaded:', scheduleData);
+        });
+
+
+        // ============================================================
+        // MODAL & EDITING
+        // ============================================================
+
+        let currentEdit = null; // Tracks which cell is being edited
+
+        function setupEventListeners() {
+            // Close modal on overlay click
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('modal-overlay')) {
+                    closeModal();
+                }
+            });
+
+            // Keyboard events
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+            });
+
+            // Tab navigation for shift inputs
+            document.querySelectorAll('.shift-input').forEach(input => {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        
+                        const allInputs = Array.from(document.querySelectorAll('.shift-input'));
+                        const currentIndex = allInputs.indexOf(this);
+                        
+                        let nextIndex;
+                        if (e.shiftKey) {
+                            // Shift+Tab goes backwards
+                            nextIndex = currentIndex - 1;
+                            if (nextIndex < 0) nextIndex = allInputs.length - 1;
+                        } else {
+                            // Tab goes forward
+                            nextIndex = currentIndex + 1;
+                            if (nextIndex >= allInputs.length) nextIndex = 0;
+                        }
+                        
+                        allInputs[nextIndex].focus();
+                        allInputs[nextIndex].select();
+                    } else if (e.key === 'Enter') {
+                        // Enter saves and moves to next row same column
+                        e.preventDefault();
+                        this.blur(); // Trigger onchange
+                        
+                        const allInputs = Array.from(document.querySelectorAll('.shift-input'));
+                        const currentIndex = allInputs.indexOf(this);
+                        // Move down 14 inputs (7 days x 2 in/out = 14 per row)
+                        const nextIndex = currentIndex + 14;
+                        if (nextIndex < allInputs.length) {
+                            allInputs[nextIndex].focus();
+                            allInputs[nextIndex].select();
+                        }
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        const allInputs = Array.from(document.querySelectorAll('.shift-input'));
+                        const currentIndex = allInputs.indexOf(this);
+                        const nextIndex = currentIndex + 14;
+                        if (nextIndex < allInputs.length) {
+                            allInputs[nextIndex].focus();
+                            allInputs[nextIndex].select();
+                        }
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        const allInputs = Array.from(document.querySelectorAll('.shift-input'));
+                        const currentIndex = allInputs.indexOf(this);
+                        const nextIndex = currentIndex - 14;
+                        if (nextIndex >= 0) {
+                            allInputs[nextIndex].focus();
+                            allInputs[nextIndex].select();
+                        }
+                    } else if (e.key === 'ArrowRight' && this.selectionStart === this.value.length) {
+                        // Right arrow at end of input moves to next cell
+                        e.preventDefault();
+                        const allInputs = Array.from(document.querySelectorAll('.shift-input'));
+                        const currentIndex = allInputs.indexOf(this);
+                        if (currentIndex + 1 < allInputs.length) {
+                            allInputs[currentIndex + 1].focus();
+                            allInputs[currentIndex + 1].select();
+                        }
+                    } else if (e.key === 'ArrowLeft' && this.selectionStart === 0) {
+                        // Left arrow at start of input moves to previous cell
+                        e.preventDefault();
+                        const allInputs = Array.from(document.querySelectorAll('.shift-input'));
+                        const currentIndex = allInputs.indexOf(this);
+                        if (currentIndex - 1 >= 0) {
+                            allInputs[currentIndex - 1].focus();
+                            allInputs[currentIndex - 1].select();
+                        }
+                    }
+                });
+            });
+
+            // Drag and drop for staff reordering
+            setupDragAndDrop();
+        }
+
+        let draggedRow = null;
+        let draggedIndex = null;
+
+        function setupDragAndDrop() {
+            const staffRows = document.querySelectorAll('.employee-row.staff[draggable="true"]');
+            
+            staffRows.forEach(row => {
+                row.addEventListener('dragstart', handleDragStart);
+                row.addEventListener('dragend', handleDragEnd);
+                row.addEventListener('dragover', handleDragOver);
+                row.addEventListener('dragenter', handleDragEnter);
+                row.addEventListener('dragleave', handleDragLeave);
+                row.addEventListener('drop', handleDrop);
+            });
+        }
+
+        function handleDragStart(e) {
+            if (currentView === 'employee') {
+                e.preventDefault();
+                return;
+            }
+            
+            draggedRow = this;
+            draggedIndex = parseInt(this.dataset.index);
+            this.classList.add('dragging');
+            
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', draggedIndex);
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            
+            // Remove all drag-over classes
+            document.querySelectorAll('.drag-over, .drag-over-bottom').forEach(el => {
+                el.classList.remove('drag-over', 'drag-over-bottom');
+            });
+            
+            draggedRow = null;
+            draggedIndex = null;
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            if (this !== draggedRow && this.classList.contains('staff')) {
+                this.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over', 'drag-over-bottom');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            
+            if (this === draggedRow) return;
+            
+            const targetIndex = parseInt(this.dataset.index);
+            
+            if (draggedIndex === targetIndex) return;
+            
+            // Reorder the employees array
+            const [movedEmployee] = scheduleData.employees.splice(draggedIndex, 1);
+            scheduleData.employees.splice(targetIndex, 0, movedEmployee);
+            
+            // Update sort order on server
+            updateEmployeeOrder();
+            
+            // Re-render
+            markUnsaved();
+            renderSchedule();
+            setupEventListeners();
+        }
+
+        async function updateEmployeeOrder() {
+            // Update sort_order for all staff employees
+            for (let i = 0; i < scheduleData.employees.length; i++) {
+                const emp = scheduleData.employees[i];
+                try {
+                    await fetch(`${API_BASE}/api/employees/${emp.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sort_order: i + 1 })
+                    });
+                } catch (error) {
+                    console.error('Error updating employee order:', error);
+                }
+            }
+        }
+
+        function parseTimeInput(value) {
+            // Parse various time formats and normalize
+            if (!value || value.trim() === '') return null;
+            
+            value = value.trim().toUpperCase();
+            
+            // Handle special values
+            if (value === '-' || value === 'OFF') return '-';
+            if (value === 'CLOSE' || value === 'CL') return 'CLOSE';
+            if (value === 'CLOSED') return 'CLOSED';
+            
+            // Try to parse time
+            // Formats: 8, 8a, 8am, 8:00, 8:00a, 8:00am, 8:00 AM
+            let match = value.match(/^(\d{1,2})(?::(\d{2}))?\s*(A|AM|P|PM)?$/i);
+            if (!match) return value; // Return as-is if can't parse
+            
+            let hours = parseInt(match[1]);
+            let mins = match[2] ? parseInt(match[2]) : 0;
+            let period = match[3] ? match[3].charAt(0).toUpperCase() : null;
+            
+            // Guess AM/PM if not specified
+            if (!period) {
+                // Assume AM for 6-11, PM for 12-5
+                if (hours >= 6 && hours <= 11) period = 'A';
+                else if (hours === 12) period = 'P';
+                else if (hours >= 1 && hours <= 5) period = 'P';
+                else period = 'A';
+            }
+            
+            // Format nicely
+            const displayHour = hours === 0 ? 12 : (hours > 12 ? hours - 12 : hours);
+            const ampm = period === 'A' ? 'AM' : 'PM';
+            return `${displayHour}:${mins.toString().padStart(2, '0')} ${ampm}`;
+        }
+
+        function handleShiftInput(input, section, empIndex, dayIndex, type) {
+            const value = parseTimeInput(input.value);
+            
+            // Get current shift
+            let employee;
+            if (section === 'manager') {
+                employee = scheduleData.managers[empIndex];
+            } else if (section === 'zak') {
+                employee = scheduleData.zakReilly;
+            } else {
+                employee = scheduleData.employees[empIndex];
+            }
+            
+            // Initialize shift if needed
+            if (!employee.shifts[dayIndex]) {
+                employee.shifts[dayIndex] = { in: null, out: null };
+            }
+            
+            // Update the value
+            if (type === 'in') {
+                employee.shifts[dayIndex].in = value;
+            } else {
+                employee.shifts[dayIndex].out = value;
+            }
+            
+            // Clear shift if both are empty
+            if (!employee.shifts[dayIndex].in && !employee.shifts[dayIndex].out) {
+                employee.shifts[dayIndex] = null;
+            }
+            
+            // Update display
+            input.value = value || '';
+            
+            markUnsaved();
+            
+            // Recalculate hours
+            renderSchedule();
+            setupEventListeners();
+        }
+
+        function openShiftModal(section, empIndex, dayIndex) {
+            // Don't allow editing in employee view
+            if (currentView === 'employee') {
+                return;
+            }
+
+            // Get the employee data
+            let employee;
+            if (section === 'manager') {
+                employee = scheduleData.managers[empIndex];
+            } else if (section === 'zak') {
+                employee = scheduleData.zakReilly;
+            } else {
+                employee = scheduleData.employees[empIndex];
+            }
+
+            const day = scheduleData.days[dayIndex];
+            const shift = employee.shifts[dayIndex];
+
+            // Store current edit context
+            currentEdit = { section, empIndex, dayIndex, employee };
+
+            // Get current values
+            const inTime = shift && shift.in !== '-' ? shift.in : '';
+            const outTime = shift && shift.out !== '-' ? shift.out : '';
+
+            // Create modal HTML
+            const modalHtml = `
+                <div class="modal-overlay active" id="editModal">
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h3>Edit Shift</h3>
+                            <button class="close-btn" onclick="closeModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="modal-employee">${employee.name}</div>
+                            <div class="modal-day">${day.name}, ${day.date}</div>
+                            
+                            <div class="quick-actions">
+                                <button class="quick-btn off" onclick="setOff()">Mark as Off</button>
+                                <button class="quick-btn clear" onclick="clearShift()">Clear</button>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>In Time</label>
+                                    <select id="inTime">
+                                        <option value="">-- Select --</option>
+                                        ${generateTimeOptions(inTime)}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Out Time</label>
+                                    <select id="outTime">
+                                        <option value="">-- Select --</option>
+                                        ${generateTimeOptions(outTime)}
+                                        <option value="CLOSE" ${outTime === 'CLOSE' ? 'selected' : ''}>CLOSE</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                            <button class="btn btn-save" onclick="saveShift()">Save</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            const existing = document.getElementById('editModal');
+            if (existing) existing.remove();
+
+            // Add modal to page
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        function openEditModal(cell) {
+            // Don't allow editing in employee view
+            if (currentView === 'employee') {
+                return;
+            }
+
+            const section = cell.dataset.section;
+            const empIndex = parseInt(cell.dataset.emp);
+            const dayIndex = parseInt(cell.dataset.day);
+
+            openShiftModal(section, empIndex, dayIndex);
+        }
+
+        function generateTimeOptions(selectedTime) {
+            const times = [];
+            
+            // Generate times from 5:00 AM to 11:00 PM in 15-min increments
+            for (let hour = 5; hour <= 23; hour++) {
+                for (let min = 0; min < 60; min += 15) {
+                    const h = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+                    const period = hour >= 12 ? 'PM' : 'AM';
+                    const minStr = min.toString().padStart(2, '0');
+                    const timeStr = `${h}:${minStr} ${period}`;
+                    
+                    const selected = selectedTime === timeStr ? 'selected' : '';
+                    times.push(`<option value="${timeStr}" ${selected}>${timeStr}</option>`);
+                }
+            }
+            
+            return times.join('');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('editModal');
+            if (modal) {
+                modal.remove();
+            }
+            currentEdit = null;
+        }
+
+        function setOff() {
+            if (!currentEdit) return;
+
+            const { section, empIndex, dayIndex } = currentEdit;
+            
+            // Update the data
+            updateShiftData(section, empIndex, dayIndex, { in: '-', out: '-' });
+            
+            closeModal();
+            renderSchedule();
+            setupEventListeners();
+        }
+
+        function clearShift() {
+            if (!currentEdit) return;
+
+            const { section, empIndex, dayIndex } = currentEdit;
+            
+            // Update the data to null
+            updateShiftData(section, empIndex, dayIndex, null);
+            
+            closeModal();
+            renderSchedule();
+            setupEventListeners();
+        }
+
+        function saveShift() {
+            if (!currentEdit) return;
+
+            const { section, empIndex, dayIndex } = currentEdit;
+            
+            const inTime = document.getElementById('inTime').value;
+            const outTime = document.getElementById('outTime').value;
+
+            // Validate
+            if (inTime && !outTime) {
+                alert('Please select an Out time');
+                return;
+            }
+            if (!inTime && outTime) {
+                alert('Please select an In time');
+                return;
+            }
+
+            // Update the data
+            if (!inTime && !outTime) {
+                updateShiftData(section, empIndex, dayIndex, null);
+            } else {
+                updateShiftData(section, empIndex, dayIndex, { in: inTime, out: outTime });
+            }
+            
+            closeModal();
+            renderSchedule();
+            setupEventListeners();
+        }
+
+        function updateShiftData(section, empIndex, dayIndex, newShift) {
+            if (section === 'manager') {
+                scheduleData.managers[empIndex].shifts[dayIndex] = newShift;
+            } else if (section === 'zak') {
+                scheduleData.zakReilly.shifts[dayIndex] = newShift;
+            } else {
+                scheduleData.employees[empIndex].shifts[dayIndex] = newShift;
+            }
+            markUnsaved();
+        }
+
+
+        // ============================================================
+        // OFFICE HOURS MODAL
+        // ============================================================
+
+        function openOfficeHoursModal(dayIndex) {
+            if (currentView === 'employee') return;
+            
+            const day = scheduleData.days[dayIndex];
+            const hours = scheduleData.officeHours[dayIndex];
+            const isClosed = hours.in === "CLOSED";
+
+            const modalHtml = `
+                <div class="modal-overlay active" id="editModal">
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h3>Edit Office Hours</h3>
+                            <button class="close-btn" onclick="closeModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="modal-day" style="font-size: 12pt; font-weight: 600; margin-bottom: 16px;">${day.name}, ${day.date}</div>
+                            
+                            <div class="quick-actions">
+                                <button class="quick-btn ${isClosed ? 'off' : ''}" onclick="setOfficeClosed(${dayIndex})">Mark as Closed</button>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Open Time</label>
+                                    <select id="officeIn">
+                                        <option value="">-- Select --</option>
+                                        ${generateTimeOptions(isClosed ? '' : hours.in)}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Close Time</label>
+                                    <select id="officeOut">
+                                        <option value="">-- Select --</option>
+                                        ${generateTimeOptions(isClosed ? '' : hours.out)}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                            <button class="btn btn-save" onclick="saveOfficeHours(${dayIndex})">Save</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const existing = document.getElementById('editModal');
+            if (existing) existing.remove();
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        function setOfficeClosed(dayIndex) {
+            scheduleData.officeHours[dayIndex] = { in: "CLOSED", out: "CLOSED" };
+            markUnsaved();
+            closeModal();
+            renderSchedule();
+            setupEventListeners();
+        }
+
+        function saveOfficeHours(dayIndex) {
+            const inTime = document.getElementById('officeIn').value;
+            const outTime = document.getElementById('officeOut').value;
+
+            if (!inTime || !outTime) {
+                alert('Please select both open and close times, or mark as closed.');
+                return;
+            }
+
+            scheduleData.officeHours[dayIndex] = { in: inTime, out: outTime };
+            markUnsaved();
+            closeModal();
+            renderSchedule();
+            setupEventListeners();
+        }
+
+
+        // ============================================================
+        // EVENTS MODAL
+        // ============================================================
+
+        function openEventsModal(dayIndex) {
+            if (currentView === 'employee') return;
+            
+            const day = scheduleData.days[dayIndex];
+            const events = scheduleData.events[dayIndex] || [];
+
+            const modalHtml = `
+                <div class="modal-overlay active" id="editModal">
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h3>Edit Events</h3>
+                            <button class="close-btn" onclick="closeModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="modal-day" style="font-size: 12pt; font-weight: 600; margin-bottom: 16px;">${day.name}, ${day.date}</div>
+                            
+                            <div class="form-group full-width">
+                                <label>Events (one per line)</label>
+                                <textarea id="eventsText" placeholder="Enter events, one per line...">${events.join('\n')}</textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                            <button class="btn btn-save" onclick="saveEvents(${dayIndex})">Save</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const existing = document.getElementById('editModal');
+            if (existing) existing.remove();
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        function saveEvents(dayIndex) {
+            const text = document.getElementById('eventsText').value;
+            const events = text.split('\n').map(e => e.trim()).filter(e => e.length > 0);
+            
+            scheduleData.events[dayIndex] = events;
+            markUnsaved();
+            closeModal();
+            renderSchedule();
+            setupEventListeners();
+        }
+
+
+        // ============================================================
+        // EMPLOYEE MANAGEMENT MODALS
+        // ============================================================
+
+        function openEmployeeModal(section, empIndex) {
+            if (currentView === 'employee') return;
+            
+            let employee;
+            if (section === 'manager') {
+                employee = scheduleData.managers[empIndex];
+            } else if (section === 'zak') {
+                employee = scheduleData.zakReilly;
+            } else {
+                employee = scheduleData.employees[empIndex];
+            }
+
+            const modalHtml = `
+                <div class="modal-overlay active" id="editModal">
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h3>Edit Employee</h3>
+                            <button class="close-btn" onclick="closeModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group full-width">
+                                <label>Name</label>
+                                <input type="text" id="empName" value="${employee.name}">
+                            </div>
+                            <div class="form-group full-width">
+                                <label>Phone</label>
+                                <input type="text" id="empPhone" value="${employee.phone || ''}">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                            <button class="btn btn-save" onclick="saveEmployee('${section}', ${empIndex})">Save</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const existing = document.getElementById('editModal');
+            if (existing) existing.remove();
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        async function saveEmployee(section, empIndex) {
+            const name = document.getElementById('empName').value.trim();
+            const phone = document.getElementById('empPhone').value.trim();
+
+            if (!name) {
+                alert('Please enter a name.');
+                return;
+            }
+
+            let employee;
+            if (section === 'manager') {
+                employee = scheduleData.managers[empIndex];
+            } else if (section === 'zak') {
+                employee = scheduleData.zakReilly;
+            } else {
+                employee = scheduleData.employees[empIndex];
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/employees/${employee.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, phone })
+                });
+                
+                if (!response.ok) throw new Error('Failed to update employee');
+                
+                employee.name = name;
+                employee.phone = phone;
+
+                closeModal();
+                renderSchedule();
+                setupEventListeners();
+                
+            } catch (error) {
+                console.error('Error updating employee:', error);
+                alert('Failed to update employee.');
+            }
+        }
+
+        function openAddEmployeeModal() {
+            if (currentView === 'employee') return;
+
+            const modalHtml = `
+                <div class="modal-overlay active" id="editModal">
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h3>Add Employee</h3>
+                            <button class="close-btn" onclick="closeModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group full-width">
+                                <label>Name</label>
+                                <input type="text" id="empName" placeholder="Employee name">
+                            </div>
+                            <div class="form-group full-width">
+                                <label>Phone</label>
+                                <input type="text" id="empPhone" placeholder="(xxx) xxx-xxxx">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                            <button class="btn btn-save" onclick="addEmployee()">Add</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const existing = document.getElementById('editModal');
+            if (existing) existing.remove();
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        async function addEmployee() {
+            const name = document.getElementById('empName').value.trim();
+            const phone = document.getElementById('empPhone').value.trim();
+
+            if (!name) {
+                alert('Please enter a name.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/employees`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, phone, section: 'staff' })
+                });
+                
+                if (!response.ok) throw new Error('Failed to add employee');
+                
+                const newEmp = await response.json();
+                
+                // Add to local data
+                scheduleData.employees.push({
+                    id: newEmp.id,
+                    name: newEmp.name,
+                    phone: newEmp.phone,
+                    shifts: [null, null, null, null, null, null, null]
+                });
+
+                closeModal();
+                renderSchedule();
+                setupEventListeners();
+                
+            } catch (error) {
+                console.error('Error adding employee:', error);
+                alert('Failed to add employee.');
+            }
+        }
+
+        async function deleteEmployee(empIndex) {
+            const emp = scheduleData.employees[empIndex];
+            if (!confirm(`Are you sure you want to remove ${emp.name}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/employees/${emp.id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) throw new Error('Failed to delete employee');
+                
+                scheduleData.employees.splice(empIndex, 1);
+                renderSchedule();
+                setupEventListeners();
+                
+            } catch (error) {
+                console.error('Error deleting employee:', error);
+                alert('Failed to delete employee.');
+            }
+        }
+
+
+        // ============================================================
+        // EXPORT TO EXCEL
+        // ============================================================
+
+        function exportToExcel() {
+            // Use the server-side export endpoint
+            window.location.href = `${API_BASE}/api/schedule/${currentWeekStart}/export`;
+        }
+
+
+        // ============================================================
+        // COVERAGE VIEW
+        // ============================================================
+
+        let showCoverage = false;
+
+        function toggleCoverage() {
+            showCoverage = !showCoverage;
+            const container = document.getElementById('coverageContainer');
+            if (container) {
+                container.style.display = showCoverage ? 'block' : 'none';
+                if (showCoverage) {
+                    container.innerHTML = renderCoverageView();
+                }
+            }
+        }
+
+        function renderCoverageView() {
+            // Calculate coverage for each hour of each day
+            const coverage = calculateCoverage();
+            
+            let html = `
+                <div class="coverage-header">
+                    <h3>📈 Staff Coverage by Hour</h3>
+                </div>
+                <div class="coverage-grid">
+                    <div class="coverage-cell header">Time</div>
+            `;
+            
+            // Day headers
+            scheduleData.days.forEach(day => {
+                html += `<div class="coverage-cell header">${day.name}</div>`;
+            });
+            
+            // Hour rows (6 AM to 10 PM)
+            for (let hour = 6; hour <= 22; hour++) {
+                const h = hour > 12 ? hour - 12 : hour;
+                const period = hour >= 12 ? 'PM' : 'AM';
+                html += `<div class="coverage-cell time-label">${h}:00 ${period}</div>`;
+                
+                for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+                    const count = coverage[dayIndex][hour] || 0;
+                    const level = Math.min(count, 5);
+                    html += `<div class="coverage-cell level-${level}">${count}</div>`;
+                }
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        function calculateCoverage() {
+            // Initialize coverage array: 7 days x 24 hours
+            const coverage = [];
+            for (let d = 0; d < 7; d++) {
+                coverage[d] = {};
+            }
+            
+            // Helper to process all employees
+            function processEmployees(employees) {
+                employees.forEach(emp => {
+                    emp.shifts.forEach((shift, dayIndex) => {
+                        if (!shift || shift.in === '-') return;
+                        
+                        const startMins = parseTime(shift.in);
+                        let endMins = parseTime(shift.out);
+                        
+                        // Handle CLOSE
+                        if (shift.out === 'CLOSE') {
+                            const officeClose = scheduleData.officeHours[dayIndex];
+                            if (officeClose && officeClose.out !== 'CLOSED') {
+                                endMins = parseTime(officeClose.out);
+                            } else {
+                                endMins = parseTime('10:00 PM');
+                            }
+                        }
+                        
+                        if (startMins === null || endMins === null) return;
+                        
+                        // Mark each hour they're working
+                        const startHour = Math.floor(startMins / 60);
+                        const endHour = Math.floor(endMins / 60);
+                        
+                        for (let h = startHour; h < endHour; h++) {
+                            coverage[dayIndex][h] = (coverage[dayIndex][h] || 0) + 1;
+                        }
+                    });
+                });
+            }
+            
+            // Process all employee types
+            processEmployees(scheduleData.managers);
+            processEmployees([scheduleData.zakReilly]);
+            processEmployees(scheduleData.employees);
+            
+            return coverage;
+        }
+    </script>
+</body>
+</html>
