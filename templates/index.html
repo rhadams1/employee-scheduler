@@ -19,6 +19,364 @@
             color: #000;
         }
 
+        /* === HEADER WITH LOGO === */
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #1a9988;
+        }
+
+        .app-header .logo {
+            height: 50px;
+        }
+
+        .app-header .app-title {
+            font-size: 20pt;
+            font-weight: 600;
+            color: #1a9988;
+            letter-spacing: 0.5px;
+        }
+
+        @media print {
+            .app-header {
+                margin-bottom: 8px;
+                padding-bottom: 8px;
+            }
+            .app-header .logo {
+                height: 40px;
+            }
+            .app-header .app-title {
+                font-size: 14pt;
+            }
+        }
+
+        /* === DARK MODE === */
+        body.dark-mode {
+            background: #1a1a2e;
+            color: #eee;
+        }
+
+        body.dark-mode .app-header {
+            border-bottom-color: #1a9988;
+        }
+
+        body.dark-mode .app-header .logo {
+            filter: brightness(1.2);
+        }
+
+        body.dark-mode .schedule-container {
+            background: #16213e;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+        }
+
+        body.dark-mode .schedule-table th,
+        body.dark-mode .schedule-table td {
+            border-color: #2a2a4a;
+            color: #eee;
+        }
+
+        body.dark-mode .title-row td {
+            background: linear-gradient(135deg, #0f3460 0%, #1a5276 100%);
+        }
+
+        body.dark-mode .day-header-row th,
+        body.dark-mode .inout-header-row th {
+            background: #2a2a4a;
+            color: #ccc;
+        }
+
+        body.dark-mode .employee-row.manager td {
+            background: #5c5c00;
+            color: #fff;
+        }
+
+        body.dark-mode .employee-row.manager td.weekend {
+            background: #4a4a00;
+        }
+
+        body.dark-mode .employee-row.zak td {
+            background: #2d5a2d;
+            color: #fff;
+        }
+
+        body.dark-mode .employee-row.zak td.weekend {
+            background: #264d26;
+        }
+
+        body.dark-mode .employee-row.staff td {
+            background: #1e1e3a;
+        }
+
+        body.dark-mode .employee-row.staff td.weekend {
+            background: #2a2a4a;
+        }
+
+        body.dark-mode .employee-row.staff:nth-child(even) td {
+            background: #252545;
+        }
+
+        body.dark-mode .office-hours-row td {
+            background: #5c5c00;
+            color: #fff;
+        }
+
+        body.dark-mode .events-row td:first-child {
+            background: #5c5c00;
+            color: #fff;
+        }
+
+        body.dark-mode .notice-row .warning {
+            background: #2d5a2d;
+        }
+
+        body.dark-mode .shift-input {
+            color: #eee;
+        }
+
+        body.dark-mode .shift-input:focus {
+            background: #2a2a4a;
+            border-color: #1a9988;
+        }
+
+        body.dark-mode .shift-popup-btn {
+            background: #3a3a5a;
+            color: #ccc;
+        }
+
+        body.dark-mode .shift-popup-btn:hover {
+            background: #1a9988;
+            color: #fff;
+        }
+
+        body.dark-mode .toolbar {
+            color: #ccc;
+        }
+
+        body.dark-mode .action-btn {
+            background: #2a2a4a;
+            color: #ccc;
+            border-color: #3a3a5a;
+        }
+
+        body.dark-mode .action-btn:hover {
+            background: #3a3a5a;
+            border-color: #1a9988;
+        }
+
+        body.dark-mode .action-btn.primary {
+            background: #1a9988;
+            color: #fff;
+        }
+
+        body.dark-mode .view-toggle {
+            background: #2a2a4a;
+        }
+
+        body.dark-mode .view-btn {
+            background: transparent;
+            color: #ccc;
+        }
+
+        body.dark-mode .view-btn.active {
+            background: #1a9988;
+            color: #fff;
+        }
+
+        body.dark-mode .week-nav-btn {
+            background: #2a2a4a;
+            color: #ccc;
+            border-color: #3a3a5a;
+        }
+
+        body.dark-mode .week-nav-btn:hover {
+            background: #3a3a5a;
+        }
+
+        body.dark-mode .legend {
+            background: #16213e;
+        }
+
+        body.dark-mode .legend-item span {
+            color: #ccc;
+        }
+
+        body.dark-mode .modal {
+            background: #16213e;
+            color: #eee;
+        }
+
+        body.dark-mode .modal-header {
+            border-bottom-color: #2a2a4a;
+        }
+
+        body.dark-mode .modal-footer {
+            border-top-color: #2a2a4a;
+        }
+
+        body.dark-mode .form-group select,
+        body.dark-mode .form-group input,
+        body.dark-mode .form-group textarea {
+            background: #2a2a4a;
+            border-color: #3a3a5a;
+            color: #eee;
+        }
+
+        body.dark-mode .quick-btn {
+            background: #2a2a4a;
+            color: #ccc;
+            border-color: #3a3a5a;
+        }
+
+        body.dark-mode .quick-btn:hover {
+            background: #3a3a5a;
+        }
+
+        body.dark-mode .coverage-container {
+            background: #16213e;
+        }
+
+        body.dark-mode .coverage-cell {
+            background: #1e1e3a;
+            color: #ccc;
+        }
+
+        body.dark-mode .coverage-cell.header {
+            background: #2a2a4a;
+        }
+
+        body.dark-mode .add-employee-row td {
+            background: #1e1e3a;
+            border-color: #3a3a5a;
+        }
+
+        body.dark-mode .add-employee-row td:hover {
+            background: #2a2a4a;
+        }
+
+        body.dark-mode .drag-handle {
+            color: #666;
+        }
+
+        body.dark-mode .drag-handle:hover {
+            color: #999;
+        }
+
+        /* Dark mode toggle button */
+        .dark-mode-toggle {
+            background: none;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.15s;
+        }
+
+        .dark-mode-toggle:hover {
+            border-color: #1a9988;
+        }
+
+        body.dark-mode .dark-mode-toggle {
+            border-color: #3a3a5a;
+        }
+
+        body.dark-mode .dark-mode-toggle:hover {
+            border-color: #1a9988;
+        }
+
+        /* === KEYBOARD HINTS === */
+        .keyboard-hints {
+            display: flex;
+            gap: 12px;
+            font-size: 9pt;
+            color: #888;
+            margin-left: 12px;
+        }
+
+        .keyboard-hint {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .keyboard-hint kbd {
+            background: #e0e0e0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-family: monospace;
+            font-size: 9pt;
+        }
+
+        body.dark-mode .keyboard-hints {
+            color: #666;
+        }
+
+        body.dark-mode .keyboard-hint kbd {
+            background: #2a2a4a;
+            border-color: #3a3a5a;
+            color: #aaa;
+        }
+
+        /* === UNDO/REDO BUTTONS === */
+        .undo-redo-btns {
+            display: flex;
+            gap: 4px;
+        }
+
+        .undo-redo-btn {
+            padding: 6px 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.15s;
+        }
+
+        .undo-redo-btn:hover:not(:disabled) {
+            border-color: #2471a3;
+        }
+
+        .undo-redo-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        body.dark-mode .undo-redo-btn {
+            background: #2a2a4a;
+            border-color: #3a3a5a;
+            color: #ccc;
+        }
+
+        body.dark-mode .undo-redo-btn:hover:not(:disabled) {
+            border-color: #1a9988;
+        }
+
+        /* Auto-save indicator */
+        .auto-save-status {
+            font-size: 9pt;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .auto-save-status.saving {
+            color: #f0ad4e;
+        }
+
+        .auto-save-status.saved {
+            color: #5cb85c;
+        }
+
+        .auto-save-status.error {
+            color: #d9534f;
+        }
+
         /* === SCHEDULE CONTAINER === */
         .schedule-container {
             background: white;
@@ -1428,6 +1786,15 @@
         // Current week start (Monday before the Wednesday) - will be set on load
         let currentWeekStart = getWeekStart(new Date()).toISOString().split('T')[0];
 
+        // Undo/Redo history
+        let undoStack = [];
+        let redoStack = [];
+        const MAX_HISTORY = 50;
+
+        // Auto-save debounce timer
+        let autoSaveTimer = null;
+        const AUTO_SAVE_DELAY = 1500; // 1.5 seconds after last change
+
         function getWeekStart(date) {
             // Find the Monday before the Wednesday that starts this schedule week
             // Schedule runs Wed-Tues, so we store the Monday of that week
@@ -1450,6 +1817,163 @@
             
             d.setDate(d.getDate() - daysToMonday);
             return d;
+        }
+
+        // ============================================================
+        // DARK MODE
+        // ============================================================
+
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDark ? 'true' : 'false');
+            
+            // Update toggle button icon
+            const btn = document.querySelector('.dark-mode-toggle');
+            if (btn) {
+                btn.textContent = isDark ? '☀️' : '🌙';
+            }
+        }
+
+        function loadDarkModePreference() {
+            const isDark = localStorage.getItem('darkMode') === 'true';
+            if (isDark) {
+                document.body.classList.add('dark-mode');
+            }
+        }
+
+        // ============================================================
+        // UNDO / REDO
+        // ============================================================
+
+        function saveStateForUndo() {
+            // Deep copy current schedule data
+            const state = JSON.stringify({
+                managers: scheduleData.managers,
+                zakReilly: scheduleData.zakReilly,
+                employees: scheduleData.employees,
+                officeHours: scheduleData.officeHours,
+                events: scheduleData.events
+            });
+            
+            undoStack.push(state);
+            
+            // Limit stack size
+            if (undoStack.length > MAX_HISTORY) {
+                undoStack.shift();
+            }
+            
+            // Clear redo stack on new action
+            redoStack = [];
+            
+            updateUndoRedoButtons();
+        }
+
+        function undo() {
+            if (undoStack.length === 0) return;
+            
+            // Save current state to redo stack
+            const currentState = JSON.stringify({
+                managers: scheduleData.managers,
+                zakReilly: scheduleData.zakReilly,
+                employees: scheduleData.employees,
+                officeHours: scheduleData.officeHours,
+                events: scheduleData.events
+            });
+            redoStack.push(currentState);
+            
+            // Restore previous state
+            const previousState = JSON.parse(undoStack.pop());
+            scheduleData.managers = previousState.managers;
+            scheduleData.zakReilly = previousState.zakReilly;
+            scheduleData.employees = previousState.employees;
+            scheduleData.officeHours = previousState.officeHours;
+            scheduleData.events = previousState.events;
+            
+            updateUndoRedoButtons();
+            renderSchedule();
+            setupEventListeners();
+            triggerAutoSave();
+        }
+
+        function redo() {
+            if (redoStack.length === 0) return;
+            
+            // Save current state to undo stack
+            const currentState = JSON.stringify({
+                managers: scheduleData.managers,
+                zakReilly: scheduleData.zakReilly,
+                employees: scheduleData.employees,
+                officeHours: scheduleData.officeHours,
+                events: scheduleData.events
+            });
+            undoStack.push(currentState);
+            
+            // Restore next state
+            const nextState = JSON.parse(redoStack.pop());
+            scheduleData.managers = nextState.managers;
+            scheduleData.zakReilly = nextState.zakReilly;
+            scheduleData.employees = nextState.employees;
+            scheduleData.officeHours = nextState.officeHours;
+            scheduleData.events = nextState.events;
+            
+            updateUndoRedoButtons();
+            renderSchedule();
+            setupEventListeners();
+            triggerAutoSave();
+        }
+
+        function updateUndoRedoButtons() {
+            const undoBtn = document.getElementById('undoBtn');
+            const redoBtn = document.getElementById('redoBtn');
+            
+            if (undoBtn) undoBtn.disabled = undoStack.length === 0;
+            if (redoBtn) redoBtn.disabled = redoStack.length === 0;
+        }
+
+        // ============================================================
+        // AUTO-SAVE
+        // ============================================================
+
+        function triggerAutoSave() {
+            // Clear existing timer
+            if (autoSaveTimer) {
+                clearTimeout(autoSaveTimer);
+            }
+            
+            // Update status to "saving..."
+            updateAutoSaveStatus('saving');
+            
+            // Set new timer
+            autoSaveTimer = setTimeout(async () => {
+                try {
+                    await saveToStorage();
+                    updateAutoSaveStatus('saved');
+                } catch (error) {
+                    console.error('Auto-save failed:', error);
+                    updateAutoSaveStatus('error');
+                }
+            }, AUTO_SAVE_DELAY);
+        }
+
+        function updateAutoSaveStatus(status) {
+            const statusEl = document.getElementById('autoSaveStatus');
+            if (!statusEl) return;
+            
+            statusEl.className = 'auto-save-status ' + status;
+            
+            if (status === 'saving') {
+                statusEl.innerHTML = '<span class="icon">⏳</span> Saving...';
+            } else if (status === 'saved') {
+                statusEl.innerHTML = '<span class="icon">✓</span> Auto-saved';
+            } else if (status === 'error') {
+                statusEl.innerHTML = '<span class="icon">⚠</span> Save failed';
+            }
+        }
+
+        function markUnsaved() {
+            hasUnsavedChanges = true;
+            triggerAutoSave();
         }
 
         function setView(view) {
@@ -1692,8 +2216,13 @@
 
         function renderSchedule() {
             const app = document.getElementById('app');
+            const isDark = document.body.classList.contains('dark-mode');
             
             app.innerHTML = `
+                <div class="app-header">
+                    <img src="/static/Ice_Line_Logo.png" alt="Ice Line" class="logo">
+                    <span class="app-title">Employee Scheduler</span>
+                </div>
                 ${renderToolbar()}
                 <div class="schedule-container">
                     <table class="schedule-table">
@@ -1714,8 +2243,12 @@
                 </div>
             `;
             
+            // Update dark mode button icon
+            const darkBtn = document.querySelector('.dark-mode-toggle');
+            if (darkBtn) darkBtn.textContent = isDark ? '☀️' : '🌙';
+            
             setView(currentView);
-            updateSaveStatus();
+            updateUndoRedoButtons();
         }
 
         function renderToolbar() {
@@ -1730,10 +2263,18 @@
                         <button class="action-btn" onclick="copyPreviousWeek()">
                             <span class="icon">📋</span> Copy Previous Week
                         </button>
-                        <button class="action-btn primary" onclick="saveToStorage()">
-                            <span class="icon">💾</span> Save
-                        </button>
-                        <span class="save-status">✓ Saved</span>
+                        <div class="undo-redo-btns">
+                            <button class="undo-redo-btn" onclick="undo()" title="Undo (Ctrl+Z)" id="undoBtn" disabled>↶</button>
+                            <button class="undo-redo-btn" onclick="redo()" title="Redo (Ctrl+Y)" id="redoBtn" disabled>↷</button>
+                        </div>
+                        <span class="auto-save-status" id="autoSaveStatus">
+                            <span class="icon">✓</span> Auto-saved
+                        </span>
+                        <div class="keyboard-hints">
+                            <span class="keyboard-hint"><kbd>Tab</kbd> next cell</span>
+                            <span class="keyboard-hint"><kbd>Enter</kbd> next row</span>
+                            <span class="keyboard-hint"><kbd>↑↓</kbd> navigate</span>
+                        </div>
                     </div>
                     <div class="toolbar-right">
                         <button class="action-btn" onclick="exportToExcel()">
@@ -1745,6 +2286,7 @@
                         <button class="action-btn" onclick="toggleCoverage()">
                             <span class="icon">📈</span> Coverage
                         </button>
+                        <button class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
                         <span class="view-label">View:</span>
                         <div class="view-toggle">
                             <button class="view-btn active" data-view="manager" onclick="setView('manager')">Manager</button>
@@ -1993,6 +2535,9 @@
         // ============================================================
 
         document.addEventListener('DOMContentLoaded', async function() {
+            // Load dark mode preference
+            loadDarkModePreference();
+            
             // Get current week from backend (Python calendar is source of truth)
             try {
                 const response = await fetch(`${API_BASE}/api/current-week`);
@@ -2009,6 +2554,21 @@
             
             renderSchedule();
             setupEventListeners();
+            
+            // Global keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                // Ctrl+Z for undo
+                if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                    e.preventDefault();
+                    undo();
+                }
+                // Ctrl+Y or Ctrl+Shift+Z for redo
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                    e.preventDefault();
+                    redo();
+                }
+            });
+            
             console.log('Schedule loaded:', scheduleData);
         });
 
@@ -2245,6 +2805,9 @@
         }
 
         function handleShiftInput(input, section, empIndex, dayIndex, type) {
+            // Save state before change for undo
+            saveStateForUndo();
+            
             const value = parseTimeInput(input.value);
             
             // Get current shift
