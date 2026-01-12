@@ -1,2 +1,6 @@
-flask
-openpyxl
+# Ice Line Employee Scheduler - Dependencies
+# Install: pip install -r requirements.txt
+
+flask>=3.0.0
+openpyxl>=3.1.0
+gunicorn>=21.0.0  # Production WSGI server
