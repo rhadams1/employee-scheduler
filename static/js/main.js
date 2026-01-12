@@ -462,6 +462,64 @@ async function copyPreviousWeek() {
     }
 }
 
+async function copyEmployeePreviousWeek(section, empIndex) {
+    const current = new Date(State.currentWeekStart);
+    current.setDate(current.getDate() - 7);
+    const prevWeekKey = current.toISOString().split('T')[0];
+    
+    // Get current employee
+    let employee;
+    if (section === 'manager') {
+        employee = scheduleData.managers[empIndex];
+    } else if (section === 'zak') {
+        employee = scheduleData.zakReilly;
+    } else {
+        employee = scheduleData.employees[empIndex];
+    }
+    
+    if (!confirm(`Copy ${employee.name}'s shifts from previous week?`)) return;
+    
+    try {
+        const response = await fetch(`${Config.API_BASE}/api/schedule/${prevWeekKey}`);
+        if (!response.ok) {
+            alert('No schedule found for the previous week.');
+            return;
+        }
+        
+        const prev = await response.json();
+        
+        // Find matching employee in previous week by ID
+        let prevEmployee = null;
+        
+        // Search in all sections
+        const allPrevEmployees = [
+            ...prev.managers,
+            prev.zakReilly,
+            ...prev.employees
+        ].filter(e => e);
+        
+        prevEmployee = allPrevEmployees.find(e => e.id === employee.id);
+        
+        if (!prevEmployee || !prevEmployee.shifts) {
+            alert(`No shifts found for ${employee.name} in the previous week.`);
+            return;
+        }
+        
+        saveStateForUndo();
+        employee.shifts = JSON.parse(JSON.stringify(prevEmployee.shifts));
+        
+        markUnsaved();
+        renderSchedule();
+        setupEventListeners();
+        
+        // Show brief confirmation
+        updateAutoSaveStatus('saved');
+    } catch (error) {
+        console.error('Error copying employee previous week:', error);
+        alert('Failed to copy previous week shifts.');
+    }
+}
+
 // =============================================================================
 // VIEW MANAGEMENT
 // =============================================================================
@@ -1523,6 +1581,7 @@ function renderSingleEmployeeRow(emp, section, empIndex) {
             ${emp.phone ? `<span class="employee-phone">${emp.phone}</span>` : ''}
             <span class="employee-note-icon ${noteClass}" onclick="openNoteModal('${section}', ${empIndex})" title="${noteTitle}">📝</span>
             <div class="employee-actions">
+                <button class="emp-action-btn copy" onclick="copyEmployeePreviousWeek('${section}', ${empIndex})" title="Copy this employee's previous week">📋</button>
                 <button class="emp-action-btn edit" onclick="openEmployeeModal('${section}', ${empIndex})" title="Edit">✎</button>
                 ${section === 'staff' ? `<button class="emp-action-btn delete" onclick="deleteEmployee(${empIndex})" title="Delete">✕</button>` : ''}
             </div>
@@ -1556,7 +1615,8 @@ function renderSingleEmployeeRow(emp, section, empIndex) {
     // Hours column
     const totalHours = calculateWeeklyHours(emp.shifts);
     const overtimeClass = totalHours > Config.OVERTIME_THRESHOLD ? 'overtime' : '';
-    html += `<td class="hours-cell ${overtimeClass}">${totalHours > 0 ? totalHours.toFixed(1) : '-'}</td>`;
+    const overtimeTitle = totalHours > Config.OVERTIME_THRESHOLD ? `⚠️ Over ${Config.OVERTIME_THRESHOLD} hours!` : '';
+    html += `<td class="hours-cell ${overtimeClass}" title="${overtimeTitle}">${totalHours > 0 ? totalHours.toFixed(1) : '-'}</td>`;
     
     html += '</tr>';
     return html;
@@ -1615,8 +1675,11 @@ function renderEventsRow() {
         const weekendClass = isWeekend ? 'weekend' : '';
         const eventText = events && events.length > 0 ? events.join(', ') : '';
         
-        html += `<td colspan="2" class="shift-cell ${weekendClass}" onclick="openEventsModal(${dayIndex})" style="cursor: pointer;">
-            <span class="event-text">${eventText}</span>
+        html += `<td colspan="2" class="shift-cell ${weekendClass}">
+            <input type="text" class="shift-input event-input" value="${eventText}" 
+                   onchange="handleEventInput(this, ${dayIndex})"
+                   onclick="event.stopPropagation()">
+            <button class="shift-popup-btn" onclick="openEventsModal(${dayIndex})" title="Multiple events">⚙</button>
         </td>`;
     });
     

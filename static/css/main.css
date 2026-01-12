@@ -482,6 +482,13 @@ body {
 .hours-cell.overtime {
     background: #f8d7da !important;
     color: #721c24;
+    font-weight: bold;
+    animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+    0%, 100% { background: #f8d7da; }
+    50% { background: #f5c6cb; }
 }
 
 /* =============================================================================
@@ -595,6 +602,15 @@ body {
 
 .emp-action-btn.edit:hover {
     background: #bbdefb;
+}
+
+.emp-action-btn.copy {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.emp-action-btn.copy:hover {
+    background: #c8e6c9;
 }
 
 .emp-action-btn.delete {
@@ -1348,6 +1364,11 @@ body.dark-mode .add-employee-row td:hover {
 body.dark-mode .emp-action-btn.edit {
     background: #1a2a3a;
     color: #58a6ff;
+}
+
+body.dark-mode .emp-action-btn.copy {
+    background: #1a2d1f;
+    color: #3fb950;
 }
 
 body.dark-mode .emp-action-btn.delete {
