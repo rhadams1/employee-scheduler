@@ -394,6 +394,12 @@ def register_routes(app):
     def index():
         return render_template('index.html')
     
+    @app.route('/employee')
+    @app.route('/employee/')
+    def employee_portal():
+        """Employee portal - read-only schedule view"""
+        return render_template('employee_portal.html')
+    
     # -------------------------------------------------------------------------
     # Schedule API
     # -------------------------------------------------------------------------
@@ -974,9 +980,9 @@ def register_routes(app):
             if 'employee_notes' in backup_data:
                 for note in backup_data['employee_notes']:
                     cursor.execute('''
-                        INSERT INTO employee_notes (id, schedule_id, employee_id, note, created_at, updated_at)
+                        INSERT INTO employee_notes (id, employee_id, week_start, note, created_at, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (note['id'], note['schedule_id'], note['employee_id'],
+                    ''', (note['id'], note['employee_id'], note['week_start'],
                           note.get('note'), note.get('created_at'), note.get('updated_at')))
             
             db.commit()
