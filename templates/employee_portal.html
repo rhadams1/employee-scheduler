@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Ice Line Schedule</title>
+    <link rel="stylesheet" href="/static/css/employee_portal.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <img src="/static/Ice_Line_Logo.png" alt="Ice Line" class="logo">
+            <h1>Employee Schedule</h1>
+        </header>
+        
+        <div class="week-nav">
+            <button class="nav-btn" onclick="navigateWeek(-1)">← Previous</button>
+            <span class="week-title" id="weekTitle">Loading...</span>
+            <button class="nav-btn" onclick="navigateWeek(1)">Next →</button>
+        </div>
+        
+        <div class="filter-bar">
+            <label for="employeeFilter">Show:</label>
+            <select id="employeeFilter" onchange="filterSchedule()">
+                <option value="all">All Employees</option>
+            </select>
+        </div>
+        
+        <div class="schedule-container" id="scheduleContainer">
+            <div class="loading">Loading schedule...</div>
+        </div>
+        
+        <div class="office-hours-card" id="officeHoursCard">
+            <h3>Front Office Hours</h3>
+            <div class="office-hours-grid" id="officeHoursGrid"></div>
+        </div>
+        
+        <div class="events-card" id="eventsCard" style="display: none;">
+            <h3>Special Events This Week</h3>
+            <div class="events-list" id="eventsList"></div>
+        </div>
+        
+        <footer class="footer">
+            <p>If unable to work a scheduled shift, you must find a replacement.</p>
+            <p class="updated-time" id="updatedTime"></p>
+        </footer>
+    </div>
+    
+    <script src="/static/js/employee_portal.js"></script>
+</body>
+</html>
