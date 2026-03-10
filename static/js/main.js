@@ -132,8 +132,11 @@ function getWeekStartFallback(date) {
     else if (day === 1) daysToMonday = 7;
     else if (day === 2) daysToMonday = 8;
     else daysToMonday = day - 1;
-    d.setDate(d.getDate() - daysToMonday);
-    return d.toISOString().split('T')[0];
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    const dt = d.getDate();
+    const monday = new Date(Date.UTC(y, m, dt - daysToMonday));
+    return monday.toISOString().split('T')[0];
 }
 
 // =============================================================================
@@ -405,10 +408,8 @@ function markUnsaved() {
 // =============================================================================
 
 async function navigateWeek(direction) {
-    const current = new Date(State.currentWeekStart);
-    current.setDate(current.getDate() + (direction * 7));
-    const newWeekStart = current.toISOString().split('T')[0];
-    
+    const newWeekStart = addDaysToDateStr(State.currentWeekStart, direction * 7);
+
     await loadSchedule(newWeekStart);
     State.undoStack = [];
     State.redoStack = [];
@@ -418,9 +419,7 @@ async function navigateWeek(direction) {
 }
 
 async function copyPreviousWeek() {
-    const current = new Date(State.currentWeekStart);
-    current.setDate(current.getDate() - 7);
-    const prevWeekKey = current.toISOString().split('T')[0];
+    const prevWeekKey = addDaysToDateStr(State.currentWeekStart, -7);
     
     if (!confirm('Copy shifts from previous week?')) return;
     
@@ -463,9 +462,7 @@ async function copyPreviousWeek() {
 }
 
 async function copyEmployeePreviousWeek(section, empIndex) {
-    const current = new Date(State.currentWeekStart);
-    current.setDate(current.getDate() - 7);
-    const prevWeekKey = current.toISOString().split('T')[0];
+    const prevWeekKey = addDaysToDateStr(State.currentWeekStart, -7);
     
     // Get current employee
     let employee;
@@ -548,11 +545,14 @@ function toggleCoverage() {
 // HOLIDAYS & TIME UTILITIES
 // =============================================================================
 
+function addDaysToDateStr(dateStr, days) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d + days));
+    return dt.toISOString().split('T')[0];
+}
+
 function getDateForDay(dayIndex) {
-    const weekStart = new Date(State.currentWeekStart);
-    const wed = new Date(weekStart);
-    wed.setDate(wed.getDate() + 2 + dayIndex);
-    return wed.toISOString().split('T')[0];
+    return addDaysToDateStr(State.currentWeekStart, 2 + dayIndex);
 }
 
 function getHolidayForDay(dayIndex) {
