@@ -9,9 +9,13 @@ from datetime import datetime, timedelta, date
 from io import BytesIO
 from functools import wraps
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, jsonify, request, send_file, render_template, g
 import sqlite3
 
+from fpdf import FPDF
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -203,6 +207,26 @@ def get_week_dates(week_start_str):
         }
         for i, name in enumerate(day_names)
     ]
+
+
+def parse_time_to_minutes(time_str):
+    """Convert time string like '9:00 AM' to minutes since midnight"""
+    if not time_str or time_str in ('-', 'CLOSE', 'CLOSED'):
+        return None
+    try:
+        time_str = time_str.strip().upper()
+        if 'AM' in time_str or 'PM' in time_str:
+            parts = time_str.replace('AM', '').replace('PM', '').strip().split(':')
+            hour = int(parts[0])
+            minute = int(parts[1]) if len(parts) > 1 else 0
+            if 'PM' in time_str and hour != 12:
+                hour += 12
+            if 'AM' in time_str and hour == 12:
+                hour = 0
+            return hour * 60 + minute
+    except (ValueError, IndexError):
+        return None
+    return None
 
 
 def format_week_title(wed_date):
@@ -835,9 +859,160 @@ def register_routes(app):
             return jsonify({'error': str(e)}), 400
 
     # -------------------------------------------------------------------------
+    # PDF Export API
+    # -------------------------------------------------------------------------
+
+    @app.route('/api/schedule/<week_start>/export-pdf', methods=['GET'])
+    def export_schedule_pdf(week_start):
+        """Export schedule to PDF with formatting"""
+        try:
+            data = build_schedule_response(week_start)
+
+            pdf = FPDF(orientation='L', unit='mm', format='A4')
+            pdf.add_page()
+            pdf.set_auto_page_break(auto=True, margin=10)
+
+            # Title
+            pdf.set_font('Helvetica', 'B', 14)
+            pdf.cell(0, 10, f"Ice Line Office Schedule - Week of {data['weekTitle']}", ln=True, align='C')
+            pdf.ln(3)
+
+            # Table configuration
+            name_col_w = 50
+            day_col_w = 26
+            sub_col_w = 13
+            hours_col_w = 16
+            row_h = 7
+
+            # Day header row
+            pdf.set_font('Helvetica', 'B', 8)
+            pdf.set_fill_color(217, 217, 217)
+            pdf.cell(name_col_w, row_h, 'Employee', 1, 0, 'C', True)
+            for day in data['days']:
+                pdf.cell(day_col_w, row_h, f"{day['name']} {day['date']}", 1, 0, 'C', True)
+            pdf.cell(hours_col_w, row_h, 'Hours', 1, 1, 'C', True)
+
+            # In/Out sub-header
+            pdf.set_font('Helvetica', 'B', 7)
+            pdf.cell(name_col_w, row_h, '', 1, 0, 'C', True)
+            for _ in data['days']:
+                pdf.cell(sub_col_w, row_h, 'In', 1, 0, 'C', True)
+                pdf.cell(sub_col_w, row_h, 'Out', 1, 0, 'C', True)
+            pdf.cell(hours_col_w, row_h, '', 1, 1, 'C', True)
+
+            def write_employee_row(emp, fill_rgb=None):
+                pdf.set_font('Helvetica', 'B' if fill_rgb else '', 8)
+                if fill_rgb:
+                    pdf.set_fill_color(*fill_rgb)
+
+                name = emp['name']
+                if emp.get('phone'):
+                    name += f"  {emp['phone']}"
+                pdf.cell(name_col_w, row_h, name, 1, 0, 'L', bool(fill_rgb))
+
+                pdf.set_font('Helvetica', '', 8)
+                for shift in emp['shifts']:
+                    in_val = shift['in'] if shift and shift.get('in') else ''
+                    out_val = shift['out'] if shift and shift.get('out') else ''
+                    pdf.cell(sub_col_w, row_h, str(in_val), 1, 0, 'C', bool(fill_rgb))
+                    pdf.cell(sub_col_w, row_h, str(out_val), 1, 0, 'C', bool(fill_rgb))
+
+                # Calculate hours
+                total = 0
+                for shift in emp['shifts']:
+                    if shift and shift.get('in') and shift.get('out'):
+                        if shift['in'] == '-' or shift['out'] == '-':
+                            continue
+                        in_mins = parse_time_to_minutes(shift['in'])
+                        out_mins = parse_time_to_minutes(shift['out'])
+                        if shift['out'] == 'CLOSE':
+                            out_mins = parse_time_to_minutes('10:00 PM')
+                        if in_mins is not None and out_mins is not None and out_mins > in_mins:
+                            total += (out_mins - in_mins) / 60
+
+                hours_str = f"{total:.1f}" if total > 0 else '-'
+                pdf.set_font('Helvetica', 'B' if total > 40 else '', 8)
+                if total > 40:
+                    pdf.set_text_color(255, 0, 0)
+                pdf.cell(hours_col_w, row_h, hours_str, 1, 1, 'C', bool(fill_rgb))
+                pdf.set_text_color(0, 0, 0)
+
+            # Managers (yellow)
+            for emp in data['managers']:
+                write_employee_row(emp, (255, 255, 0))
+
+            pdf.ln(2)
+
+            # Zak (green)
+            if data['zakReilly']:
+                write_employee_row(data['zakReilly'], (146, 208, 80))
+
+            pdf.ln(2)
+
+            # Staff (no fill)
+            for emp in data['employees']:
+                write_employee_row(emp)
+
+            pdf.ln(2)
+
+            # Office Hours row
+            pdf.set_font('Helvetica', 'B', 8)
+            pdf.set_fill_color(255, 255, 0)
+            pdf.cell(name_col_w, row_h, 'Front Office Hours*', 1, 0, 'L', True)
+            pdf.set_font('Helvetica', '', 8)
+            for oh in data['officeHours']:
+                in_val = oh.get('in', '') or ''
+                out_val = oh.get('out', '') or ''
+                if in_val == 'CLOSED':
+                    pdf.cell(day_col_w, row_h, 'CLOSED', 1, 0, 'C', True)
+                else:
+                    pdf.cell(sub_col_w, row_h, str(in_val), 1, 0, 'C', True)
+                    pdf.cell(sub_col_w, row_h, str(out_val), 1, 0, 'C', True)
+            pdf.cell(hours_col_w, row_h, '', 1, 1, 'C', True)
+
+            # Notice
+            pdf.set_font('Helvetica', '', 7)
+            pdf.cell(name_col_w, row_h, '* Hours are subject to change', 0, 0, 'L')
+            pdf.set_font('Helvetica', 'B', 7)
+            pdf.set_text_color(255, 0, 0)
+            pdf.cell(0, row_h, 'IF UNABLE TO WORK A SCHEDULED SHIFT YOU MUST FIND A REPLACEMENT', 0, 1, 'C')
+            pdf.set_text_color(0, 0, 0)
+
+            # Events row
+            pdf.set_font('Helvetica', 'B', 8)
+            pdf.set_fill_color(255, 255, 0)
+            pdf.cell(name_col_w, row_h, 'Special Events:', 1, 0, 'L', True)
+            pdf.set_font('Helvetica', '', 8)
+            for events in data['events']:
+                event_text = ', '.join(events) if events else ''
+                pdf.cell(day_col_w, row_h, event_text, 1, 0, 'C', False)
+            pdf.cell(hours_col_w, row_h, '', 1, 1, 'C', False)
+
+            # Generate filename
+            d1 = data['days'][0]['date'].replace('/', '-')
+            d2 = data['days'][6]['date'].replace('/', '-')
+            year = data['weekTitle'].split(', ')[-1][-2:]
+            filename = f"schedule_{d1}-{year}_to_{d2}-{year}.pdf"
+
+            output = BytesIO()
+            pdf.output(output)
+            output.seek(0)
+
+            return send_file(
+                output,
+                mimetype='application/pdf',
+                as_attachment=True,
+                download_name=filename
+            )
+
+        except Exception as e:
+            logging.error(f"Error exporting PDF: {e}")
+            return jsonify({'error': str(e)}), 400
+
+    # -------------------------------------------------------------------------
     # Database Export/Import API
     # -------------------------------------------------------------------------
-    
+
     @app.route('/api/backup/export', methods=['GET'])
     def export_database():
         """Export entire database to JSON for backup"""

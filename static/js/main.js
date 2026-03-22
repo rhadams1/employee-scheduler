@@ -653,16 +653,7 @@ function exportToExcel() {
 }
 
 function exportToPDF() {
-    document.body.classList.add('pdf-export');
-    
-    const coverageContainer = document.getElementById('coverageContainer');
-    const wasShowingCoverage = coverageContainer && coverageContainer.style.display !== 'none';
-    if (wasShowingCoverage) coverageContainer.style.display = 'none';
-    
-    window.print();
-    
-    document.body.classList.remove('pdf-export');
-    if (wasShowingCoverage) coverageContainer.style.display = 'block';
+    window.location.href = `${Config.API_BASE}/api/schedule/${State.currentWeekStart}/export-pdf`;
 }
 
 // =============================================================================
@@ -822,9 +813,9 @@ async function updateEmployeeOrder() {
 
 function handleShiftInput(input, section, empIndex, dayIndex, type) {
     saveStateForUndo();
-    
+
     const value = parseTimeInput(input.value);
-    
+
     let employee;
     if (section === 'manager') {
         employee = scheduleData.managers[empIndex];
@@ -833,21 +824,33 @@ function handleShiftInput(input, section, empIndex, dayIndex, type) {
     } else {
         employee = scheduleData.employees[empIndex];
     }
-    
+
     if (!employee.shifts[dayIndex]) {
         employee.shifts[dayIndex] = { in: null, out: null };
     }
-    
+
     employee.shifts[dayIndex][type] = value;
-    
+
     if (!employee.shifts[dayIndex].in && !employee.shifts[dayIndex].out) {
         employee.shifts[dayIndex] = null;
     }
-    
+
     input.value = value || '';
+
+    // Update hours cell in-place instead of full re-render
+    const row = input.closest('tr');
+    if (row) {
+        const hoursCell = row.querySelector('.hours-cell');
+        if (hoursCell) {
+            const totalHours = calculateWeeklyHours(employee.shifts);
+            const isOvertime = totalHours > Config.OVERTIME_THRESHOLD;
+            hoursCell.className = 'hours-cell' + (isOvertime ? ' overtime' : '');
+            hoursCell.title = isOvertime ? `⚠️ Over ${Config.OVERTIME_THRESHOLD} hours!` : '';
+            hoursCell.textContent = totalHours > 0 ? totalHours.toFixed(1) : '-';
+        }
+    }
+
     markUnsaved();
-    renderSchedule();
-    setupEventListeners();
 }
 
 function updateShiftData(section, empIndex, dayIndex, shiftData) {
