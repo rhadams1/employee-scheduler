@@ -29,6 +29,7 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
     DATABASE = os.environ.get('DATABASE_PATH', 'schedule.db')
     DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
+    BACKUP_IMPORT_ENABLED = os.environ.get('BACKUP_IMPORT_ENABLED', 'false').lower() == 'true'
     
     # Schedule configuration
     WEEK_START_DAY = 'wednesday'  # Schedule week starts on Wednesday
@@ -88,8 +89,13 @@ def create_app(config_class=Config):
 def get_db():
     """Get database connection for current request"""
     if 'db' not in g:
-        g.db = sqlite3.connect(Config.DATABASE)
+        g.db = sqlite3.connect(Config.DATABASE, timeout=5.0)
         g.db.row_factory = sqlite3.Row
+        # WAL mode + busy_timeout: needed because we run 9 gunicorn workers,
+        # auto-save fires every 1.5s, and saves do delete-then-insert per week
+        g.db.execute('PRAGMA journal_mode = WAL')
+        g.db.execute('PRAGMA busy_timeout = 5000')
+        g.db.execute('PRAGMA foreign_keys = ON')
     return g.db
 
 
@@ -122,6 +128,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             week_start DATE NOT NULL UNIQUE,
             week_title TEXT NOT NULL,
+            version INTEGER NOT NULL DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -174,7 +181,14 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_schedules_week ON schedules(week_start);
         CREATE INDEX IF NOT EXISTS idx_employees_active ON employees(active, section);
     ''')
-    
+
+    # Migrations: add columns to existing DBs that pre-date them
+    cursor.execute("PRAGMA table_info(schedules)")
+    schedule_cols = {row[1] for row in cursor.fetchall()}
+    if 'version' not in schedule_cols:
+        cursor.execute("ALTER TABLE schedules ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+        logging.info("Migrated: added schedules.version column")
+
     # Seed default employees if table is empty
     cursor.execute('SELECT COUNT(*) FROM employees')
     if cursor.fetchone()[0] == 0:
@@ -183,7 +197,7 @@ def init_db():
             Config.DEFAULT_EMPLOYEES
         )
         logging.info("Initialized default employees")
-    
+
     conn.commit()
     conn.close()
 
@@ -372,6 +386,7 @@ def build_schedule_response(week_start_str):
     return {
         'weekTitle': schedule['week_title'],
         'weekStart': schedule['week_start'],
+        'version': schedule['version'],
         'days': get_week_dates(week_start_str),
         'managers': managers,
         'zakReilly': zak,
@@ -414,13 +429,11 @@ def register_routes(app):
     def teardown(exception):
         close_db()
     
-    @app.after_request
-    def add_cors_headers(response):
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        return response
-    
+    # CORS removed (April 2026): API_BASE is empty (same-origin); the wildcard
+    # was exposing write endpoints to any browser tab. Add a narrow allowlist
+    # here if a real cross-origin client ever needs access.
+
+
     # -------------------------------------------------------------------------
     # Pages
     # -------------------------------------------------------------------------
@@ -441,6 +454,7 @@ def register_routes(app):
         return render_template(
             'index.html',
             static_v=_static_version('js/main.js', 'css/main.css'),
+            backup_import_enabled=Config.BACKUP_IMPORT_ENABLED,
         )
 
     @app.route('/employee')
@@ -477,42 +491,75 @@ def register_routes(app):
     
     @app.route('/api/schedule/<week_start>', methods=['POST'])
     def save_schedule(week_start):
-        """Save/update schedule for a specific week"""
+        """Save/update schedule for a specific week with optimistic concurrency.
+
+        Client must send `base_version` matching the version it last received.
+        Returns 409 if another save bumped the version since then; client
+        should reload and surface the conflict to the user.
+        """
         try:
             data = request.json
-            logging.info(f"Saving schedule for week: {week_start}")
-            logging.info(f"Payload: {data}")
-            
+            base_version = data.get('base_version')
+
             schedule = get_or_create_schedule(week_start)
             schedule_id = schedule['id']
-            
+
             db = get_db()
             cursor = db.cursor()
-            
+
+            # Optimistic concurrency: atomic version bump. If base_version
+            # doesn't match current, this UPDATE affects 0 rows -> conflict.
+            # base_version may be None for legacy clients during the rollout
+            # window; in that case we accept the save but log it.
+            if base_version is not None:
+                cursor.execute(
+                    '''UPDATE schedules
+                       SET version = version + 1, updated_at = CURRENT_TIMESTAMP
+                       WHERE id = ? AND version = ?''',
+                    (schedule_id, base_version)
+                )
+                if cursor.rowcount == 0:
+                    cursor.execute('SELECT version FROM schedules WHERE id = ?', (schedule_id,))
+                    current = cursor.fetchone()
+                    db.rollback()
+                    return jsonify({
+                        'error': 'conflict',
+                        'message': 'Schedule was updated elsewhere. Reload to see the latest.',
+                        'current_version': current['version'] if current else None,
+                    }), 409
+            else:
+                cursor.execute(
+                    '''UPDATE schedules
+                       SET version = version + 1, updated_at = CURRENT_TIMESTAMP
+                       WHERE id = ?''',
+                    (schedule_id,)
+                )
+                logging.warning(f"save_schedule: legacy client (no base_version) for week {week_start}")
+
             # Update shifts
             if 'shifts' in data:
                 cursor.execute('DELETE FROM shifts WHERE schedule_id = ?', (schedule_id,))
                 for shift in data['shifts']:
                     if shift.get('in') or shift.get('out'):
                         cursor.execute(
-                            '''INSERT INTO shifts 
-                               (schedule_id, employee_id, day_index, time_in, time_out) 
+                            '''INSERT INTO shifts
+                               (schedule_id, employee_id, day_index, time_in, time_out)
                                VALUES (?, ?, ?, ?, ?)''',
                             (schedule_id, shift['employee_id'], shift['day_index'],
                              shift.get('in'), shift.get('out'))
                         )
-            
+
             # Update office hours
             if 'officeHours' in data:
                 cursor.execute('DELETE FROM office_hours WHERE schedule_id = ?', (schedule_id,))
                 for i, oh in enumerate(data['officeHours']):
                     cursor.execute(
-                        '''INSERT INTO office_hours 
-                           (schedule_id, day_index, time_in, time_out) 
+                        '''INSERT INTO office_hours
+                           (schedule_id, day_index, time_in, time_out)
                            VALUES (?, ?, ?, ?)''',
                         (schedule_id, i, oh.get('in'), oh.get('out'))
                     )
-            
+
             # Update events
             if 'events' in data:
                 cursor.execute('DELETE FROM events WHERE schedule_id = ?', (schedule_id,))
@@ -521,21 +568,17 @@ def register_routes(app):
                         for event_text in day_events:
                             if event_text:
                                 cursor.execute(
-                                    '''INSERT INTO events 
-                                       (schedule_id, day_index, event_text) 
+                                    '''INSERT INTO events
+                                       (schedule_id, day_index, event_text)
                                        VALUES (?, ?, ?)''',
                                     (schedule_id, i, event_text)
                                 )
-            
-            # Update timestamp
-            cursor.execute(
-                'UPDATE schedules SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                (schedule_id,)
-            )
-            
+
             db.commit()
-            logging.info(f"Schedule saved successfully for week: {week_start}")
-            return jsonify({'success': True, 'message': 'Schedule saved'})
+
+            cursor.execute('SELECT version FROM schedules WHERE id = ?', (schedule_id,))
+            new_version = cursor.fetchone()['version']
+            return jsonify({'success': True, 'message': 'Schedule saved', 'version': new_version})
         
         except Exception as e:
             import traceback
@@ -1132,7 +1175,15 @@ def register_routes(app):
     
     @app.route('/api/backup/import', methods=['POST'])
     def import_database():
-        """Import database from JSON backup"""
+        """Import database from JSON backup. Disabled by default — this
+        endpoint replaces the entire DB and there is no auth on the app yet.
+        Set BACKUP_IMPORT_ENABLED=true in the LXC env to re-enable temporarily
+        when running a restore, then unset it."""
+        if not Config.BACKUP_IMPORT_ENABLED:
+            return jsonify({
+                'error': 'Backup import is disabled',
+                'message': 'Set BACKUP_IMPORT_ENABLED=true and restart the service to re-enable temporarily.'
+            }), 403
         try:
             if 'file' not in request.files:
                 return jsonify({'error': 'No file provided'}), 400

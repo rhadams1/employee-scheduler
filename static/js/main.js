@@ -32,10 +32,12 @@ const State = {
 let scheduleData = {
     weekTitle: '',
     weekStart: '',
+    version: null,
     days: [],
     managers: [],
     zakReilly: null,
     employees: [],
+    hiddenEmployees: [],
     officeHours: [],
     events: []
 };
@@ -153,6 +155,7 @@ async function loadSchedule(weekStart) {
         scheduleData = {
             weekTitle: data.weekTitle,
             weekStart: data.weekStart,
+            version: data.version,
             days: data.days,
             managers: data.managers,
             zakReilly: data.zakReilly,
@@ -196,22 +199,34 @@ async function saveSchedule() {
         const payload = {
             shifts,
             officeHours: scheduleData.officeHours,
-            events: scheduleData.events
+            events: scheduleData.events,
+            base_version: scheduleData.version,
         };
-        
-        console.log('Saving schedule:', payload);
-        
+
         const response = await fetch(`${Config.API_BASE}/api/schedule/${State.currentWeekStart}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        
+
         const responseData = await response.json();
-        console.log('Save response:', response.status, responseData);
-        
+
+        if (response.status === 409) {
+            // Another tab/worker bumped the version. Reload and tell the user.
+            updateAutoSaveStatus('error');
+            State.hasUnsavedChanges = false;
+            alert('This schedule was changed in another window since you started editing. Reloading to show the latest version. Your unsaved edits in this tab were not saved.');
+            await loadSchedule(State.currentWeekStart);
+            renderSchedule();
+            setupEventListeners();
+            return false;
+        }
+
         if (!response.ok) throw new Error(responseData.error || 'Failed to save schedule');
-        
+
+        if (responseData.version != null) {
+            scheduleData.version = responseData.version;
+        }
         State.hasUnsavedChanges = false;
         updateAutoSaveStatus('saved');
     } catch (error) {
@@ -422,38 +437,68 @@ async function navigateWeek(direction) {
 
 async function copyPreviousWeek() {
     const prevWeekKey = addDaysToDateStr(State.currentWeekStart, -7);
-    
-    if (!confirm('Copy shifts from previous week?')) return;
-    
+
     try {
         const response = await fetch(`${Config.API_BASE}/api/schedule/${prevWeekKey}`);
         if (!response.ok) {
             alert('No schedule found for the previous week.');
             return;
         }
-        
-        saveStateForUndo();
+
         const prev = await response.json();
-        
-        scheduleData.managers.forEach((emp, i) => {
-            if (prev.managers[i]) {
-                emp.shifts = JSON.parse(JSON.stringify(prev.managers[i].shifts));
+
+        // Map by employee ID, not array index — staff order/membership can change
+        // between weeks (reorders, hidden seasonal staff, new hires).
+        const prevById = new Map();
+        const collectPrev = (e) => { if (e && e.id != null) prevById.set(e.id, e); };
+        (prev.managers || []).forEach(collectPrev);
+        collectPrev(prev.zakReilly);
+        (prev.employees || []).forEach(collectPrev);
+
+        const currentRoster = [
+            ...scheduleData.managers,
+            scheduleData.zakReilly,
+            ...scheduleData.employees,
+        ].filter(e => e);
+
+        const matched = [];
+        const skippedNoSource = []; // on this week's roster but didn't exist last week
+        currentRoster.forEach(emp => {
+            if (prevById.has(emp.id)) {
+                matched.push(emp);
+            } else {
+                skippedNoSource.push(emp);
             }
         });
-        
-        if (prev.zakReilly && scheduleData.zakReilly) {
-            scheduleData.zakReilly.shifts = JSON.parse(JSON.stringify(prev.zakReilly.shifts));
+        const currentIds = new Set(currentRoster.map(e => e.id));
+        const skippedNoDestination = []; // worked last week but not on this week's roster
+        prevById.forEach((emp, id) => {
+            if (!currentIds.has(id)) skippedNoDestination.push(emp);
+        });
+
+        let confirmMsg = `Copy shifts from previous week to ${matched.length} employee${matched.length === 1 ? '' : 's'}?`;
+        if (skippedNoSource.length > 0) {
+            confirmMsg += `\n\nSkipping (didn't work last week, will keep their current shifts):\n  • ` +
+                skippedNoSource.map(e => e.name).join('\n  • ');
         }
-        
-        scheduleData.employees.forEach((emp, i) => {
-            if (prev.employees[i]) {
-                emp.shifts = JSON.parse(JSON.stringify(prev.employees[i].shifts));
+        if (skippedNoDestination.length > 0) {
+            confirmMsg += `\n\nSkipping (worked last week but not on this week's roster):\n  • ` +
+                skippedNoDestination.map(e => e.name).join('\n  • ');
+        }
+        if (!confirm(confirmMsg)) return;
+
+        saveStateForUndo();
+
+        matched.forEach(emp => {
+            const prevEmp = prevById.get(emp.id);
+            if (prevEmp && prevEmp.shifts) {
+                emp.shifts = JSON.parse(JSON.stringify(prevEmp.shifts));
             }
         });
-        
+
         scheduleData.officeHours = JSON.parse(JSON.stringify(prev.officeHours));
         scheduleData.events = [[], [], [], [], [], [], []];
-        
+
         markUnsaved();
         renderSchedule();
         setupEventListeners();
@@ -1486,8 +1531,10 @@ function renderToolbar() {
                     </button>
                     <div class="backup-menu" id="backupMenu">
                         <button onclick="exportBackup()">📥 Export JSON Backup</button>
+                        ${document.body.dataset.backupImportEnabled === 'true' ? `
                         <button onclick="triggerImport()">📤 Import from Backup</button>
                         <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importBackup(this)">
+                        ` : ''}
                     </div>
                 </div>
                 <button class="action-btn" onclick="exportToExcel()">

@@ -6,7 +6,7 @@
     <title>Ice Line Employee Scheduler</title>
     <link rel="stylesheet" href="/static/css/main.css?v={{ static_v }}">
 </head>
-<body>
+<body data-backup-import-enabled="{{ 'true' if backup_import_enabled else 'false' }}">
     <div id="app">
         <div class="loading">Loading schedule...</div>
     </div>
