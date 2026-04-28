@@ -425,15 +425,32 @@ def register_routes(app):
     # Pages
     # -------------------------------------------------------------------------
     
+    def _static_version(*relpaths):
+        """Combined mtime of static assets, used to bust browser/CDN caches on deploy."""
+        latest = 0
+        for rel in relpaths:
+            path = os.path.join(app.static_folder, rel)
+            try:
+                latest = max(latest, int(os.path.getmtime(path)))
+            except OSError:
+                pass
+        return str(latest)
+
     @app.route('/')
     def index():
-        return render_template('index.html')
-    
+        return render_template(
+            'index.html',
+            static_v=_static_version('js/main.js', 'css/main.css'),
+        )
+
     @app.route('/employee')
     @app.route('/employee/')
     def employee_portal():
         """Employee portal - read-only schedule view"""
-        return render_template('employee_portal.html')
+        return render_template(
+            'employee_portal.html',
+            static_v=_static_version('js/employee_portal.js', 'css/employee_portal.css'),
+        )
     
     # -------------------------------------------------------------------------
     # Schedule API
