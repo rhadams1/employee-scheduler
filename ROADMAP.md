@@ -12,7 +12,7 @@ A **dead-simple scheduling app** that eliminates text message chaos. Employees k
 
 ---
 
-## Current Status (February 2026)
+## Current Status (April 2026)
 
 **Working:**
 - Weekly scheduling (Wed-Tue) with shift templates
@@ -20,12 +20,46 @@ A **dead-simple scheduling app** that eliminates text message chaos. Employees k
 - Employee portal (read-only)
 - Excel export, backup/restore
 - Dark mode
+- Hidden Employees panel (seasonal staff lifecycle)
 
 **Missing (Critical):**
 - No authentication
 - Employees can't submit availability or requests
 - No notifications when schedule changes
 - No visibility into who's available when
+
+---
+
+## Phase 0: Foundation Safety Fixes
+
+*Goal: Stop the bleeding. These are pre-feature hardening — bugs and risks that compound everything built on top.*
+
+Surfaced via April 2026 dual-AI review (Claude + Codex). Verified against production code.
+
+### 0.1 Concurrency safety
+- [ ] Add `version INTEGER NOT NULL DEFAULT 1` to `schedules` table (migration for existing DB)
+- [ ] `build_schedule_response` returns `version`
+- [ ] `POST /api/schedule/<week_start>` requires `base_version` in payload, runs atomic UPDATE with version check, returns **409 Conflict** on mismatch
+- [ ] Client increments local version on each successful save; on 409 reloads schedule and surfaces "Someone else updated this — your changes were lost"
+- [ ] Enable SQLite WAL mode and `busy_timeout = 5000` on every connection
+- **Why:** production runs 9 gunicorn workers + delete-then-insert saves; two tabs WILL silently overwrite each other today
+
+### 0.2 Restrict CORS
+- [ ] Remove the `Access-Control-Allow-Origin: *` after_request hook entirely (same-origin only — `Config.API_BASE` is empty so no cross-origin needs)
+- **Why:** wildcard exposes write endpoints to any browser tab on any site
+
+### 0.3 Disable backup import in production
+- [ ] Add `BACKUP_IMPORT_ENABLED` env var (default `false`)
+- [ ] `POST /api/backup/import` returns 403 unless flag set
+- [ ] Hide "Import from Backup" menu item when flag false
+- [ ] Leave `/api/backup/export` (read-only) accessible
+- **Why:** the import endpoint accepts a JSON file and wipes/reloads the entire DB — currently unauthenticated and reachable on the LAN. Re-enable per-restore via env var when manager auth ships (Phase 3.5)
+
+### 0.4 Whole-week copy: ID-based with warning
+- [ ] Change `copyPreviousWeek()` (main.js:438) to map by `employee_id`, matching `copyEmployeePreviousWeek()` (main.js:501)
+- [ ] Compute diff before copying: matched / in-prev-only / in-current-only
+- [ ] Confirm dialog: "Copy 6 employees? Skipping: Lena (hidden this week), Hunter (didn't work last week)"
+- **Why:** current index-based mapping silently copies the wrong employee's shifts when staff order or membership changes
 
 ---
 
@@ -139,60 +173,101 @@ CREATE TABLE recurring_availability (
 
 *Goal: Nobody misses a schedule or a change. Replace the manual weekly email.*
 
-**Design decisions from April 2026 brainstorm:**
-- Two distinct flows: **Weekly Bulletin** (full week, sent on demand) and **Change Alerts** (batched edits to a published week).
-- Both flows go via **email + SMS**, configurable per employee.
-- Send-from is `badams@icelinequadrinks.com` via the existing `iceline_auth.py` OAuth helper (need to broaden scope to include Gmail send). Replies route to Bob's inbox naturally.
-- Explicit "Send Schedule" / "Publish Changes" buttons — never auto-fire on save. No draft/publish state machine; just on-demand actions with a published_at timestamp on each weekly schedule.
-- SMS via Twilio: ~$1.15/mo for the number, ~$0.0079/msg US. Realistic monthly cost for this staff size: under $5.
+**Architectural decisions (April 2026 dual-AI review):**
 
-### 3.0 Prerequisites
-- [ ] Add `email`, `notify_email` (bool), `notify_sms` (bool) columns to `employees` table
-- [ ] UI in employee edit modal to set email + per-channel opt-ins
-- [ ] Broaden `~/.config/iceline/oauth_client.json` scopes to include `gmail.send`; re-authorize once
-- [ ] Twilio account + phone number; store creds in LXC `.env`
+- **Snapshot model, not pending_changes table.** When a schedule is published, freeze a JSON snapshot of the entire week. `/employee` reads the latest *successful* snapshot, not live data. Eliminates "staff sees half-baked manager edits" entirely.
+- **Two distinct tables, not one.** `schedule_publications` for full bulletin sends; `notification_batches` (or `change_alert_publications`) for delta sends. A change alert is a notification event derived from the diff between snapshots — it does NOT supersede the latest full publication, otherwise "latest published" becomes ambiguous.
+- **Outbox per recipient/channel with parent batch.** Delivery state lives in `notification_outbox` rows; aggregate state lives on the parent (publication or batch). Lets us resend to one person and track partial failures without losing per-recipient detail.
+- **Recipient rule = "employees in published snapshot + always-include extras"** — not hard-coded sections. Auto-handles hidden/seasonal staff. Snapshots freeze contact state at send time.
+- **Link-free first bulletin.** No `/static/` logo (use CID-attached/inline base64), no remote CSS, no "view in browser," no preference URLs, no tracking pixels. Until manager auth + public infra exist, emails must not touch the app at all.
+- **Preview invalidation.** Previews carry `schedule_version` + `snapshot_hash`. Send endpoint refuses if `schedules.version` changed since preview was generated. Eliminates "Bob previews, edits in another tab, sends stale preview."
+- **No debouncing on rapid publishes.** Disable send button while in-flight; surface "Live schedule changed since this preview" warning if version drifted. Debounce is a UI band-aid.
 
-### 3.1 Weekly Bulletin ("Send Schedule")
-- [ ] **Recipients:** active staff + managers + Zak by default; per-send "BCC extras" field for ad-hoc broadening
-- [ ] **Trigger:** "Preview & Send Bulletin" button in manager view — preview first, then send
-- [ ] **Content:** one section per day Wed–Tue with:
-  - Office hours
-  - Each employee's shifts that day
-  - DaySmart programs/sessions for that day (names + times only — Public Skate, Open Hockey, MSL games, Learn-to-Skate, etc.) via the `dash` skill
-  - Holidays
-  - Any per-day "Special Events" already captured in the events table
-- [ ] **Mechanism:** Gmail API (no SMTP relay needed)
-- [ ] Sets `published_at` on the weekly schedule row when sent
+**Send-from:** `badams@icelinequadrinks.com` via the existing `~/.config/iceline/iceline_auth.py` OAuth helper (broaden scope to include `gmail.send`).
 
-### 3.2 Change Alerts ("Publish Changes")
-- [ ] Track "pending changes since last_published_at" — every shift edit logs to a `pending_changes` table
-- [ ] Top-of-view counter: "5 pending changes — Notify staff"
-- [ ] One click → batches changes into one email/SMS per affected employee with the diff (was/now)
-- [ ] Resets pending count on send
-- [ ] Same opt-in flags as bulletin
+**SMS:** Twilio. ~$1.15/mo for the number, ~$0.0079/msg US. Under $5/mo realistic.
 
-### 3.3 Push Notifications (PWA) — *deferred*
-- [ ] Service worker for push notifications
-- [ ] "Your schedule for next week is posted" / "Your shift on Saturday changed" / "Time-off request approved"
-- [ ] Lower priority than email/SMS — depends on PWA install adoption
+### 3.0 Schema Foundation
+- [ ] Add `email`, `notify_email`, `notify_sms`, `phone_invalid`, `email_bounced` columns to `employees`
+- [ ] **One-command DB backup script** (must run before any migration)
+- [ ] Run migrations atomically with rollback on failure
 
-### 3.4 DaySmart / Dash Integration
-- [ ] Build a server-side helper that calls the `dash` skill (or its underlying API) to fetch ice activity for a given date range
-- [ ] Cache per-day results to avoid re-fetching during preview iterations
-- [ ] Surface in: weekly bulletin, "today's overview" widget on manager view, optional employee portal "what's on the ice today"
+### 3.1 Snapshot Foundation
+- [ ] `schedule_publications` table:
+  ```
+  id, week_start, snapshot_json, snapshot_hash,
+  created_from_schedule_version, created_by, status,
+  subject, body_html, body_text, recipient_summary_json,
+  send_started_at, send_completed_at, queued_at, published_at
+  ```
+- [ ] Status values: `draft_preview`, `queued`, `sending`, `complete`, `partial_failure`, `failed`, `superseded`
+- [ ] Index on `(week_start, status, published_at DESC)` for "latest successful publication"
+- [ ] Change `/employee` and `GET /api/schedule/<week>` (when called by employee portal) to read from latest successful publication
+- [ ] Manager view continues to read/write live state — unchanged
+- [ ] Nginx restrict `/employee` access until auth lands (belt-and-suspenders)
 
-### 3.5 Public-Facing Infrastructure *(prerequisite for sending links to staff)*
-- [ ] Cloudflare Tunnel from CT 700 (or Tailscale Funnel) so `https://scheduler.icelinequadrinks.com` resolves externally
-- [ ] **Blocker:** currently anyone with the URL can edit the schedule. Need at least manager auth (Phase 7.1) before public exposure. Otherwise emails should embed PDFs/HTML and not link back.
-- [ ] DNS + TLS via Cloudflare
+### 3.2 Weekly Bulletin ("Preview & Send")
+- [ ] Preview endpoint: builds snapshot in memory (does NOT persist), returns rendered email + `schedule_version` + `snapshot_hash`
+- [ ] Send endpoint: validates version unchanged since preview → 409 if drifted; persists publication row with `status=queued`; enqueues outbox rows; flips to `status=sending`/`complete`/`partial_failure` as deliveries resolve
+- [ ] **Recipients:** iterate snapshot's employees + configured "always-include" list + ad-hoc BCC extras from send dialog
+- [ ] **HTML format:** mobile-readable list-by-day. Office hours, special events, then each person's shift. NOT the wide manager table.
+- [ ] CID-attached Ice Line logo only — no `/static/` URLs in the email
+- [ ] "Resend to one person" button on publication detail view
+
+### 3.3 Notification Outbox
+- [ ] `notification_outbox` table:
+  ```
+  id, parent_type ('publication'|'batch'), parent_id,
+  employee_id (nullable), recipient_name, recipient_type
+    ('employee'|'manager'|'extra'), recipient (email/phone),
+  channel ('email'|'sms'), status, provider_message_id,
+  attempt_count, last_error, idempotency_key,
+  queued_at, sent_at
+  ```
+- [ ] Idempotency key shape: `{parent_id}:{employee_id_or_recipient_hash}:{channel}:{attempt_kind}` — supports intentional resends
+- [ ] Status values: `queued`, `sending`, `sent`, `failed`, `skipped` (e.g. employee opted out)
+- [ ] Send worker reads queued rows, attempts delivery, updates status + provider_message_id
+
+### 3.4 Change Alerts ("Notify staff of changes")
+- [ ] `change_alert_publications` table (or `notification_batches`) — references the source `schedule_publications` rows being diffed, has its own outbox parent role
+- [ ] Diff computation: compare current live state against latest successful full publication snapshot
+- [ ] Per-affected-employee message body with was/now diff
+- [ ] One outbox row per affected employee per enabled channel
+- [ ] "Notify staff of N pending changes" button surfaces only when `live_version > last_publication.created_from_schedule_version`
+
+### 3.5 Manager Auth + Public-Facing *(gating step)*
+- [ ] Manager login (PIN or password — see Phase 7.1)
+- [ ] Close any remaining unauthenticated write endpoints
+- [ ] Re-enable `BACKUP_IMPORT_ENABLED` behind auth
+- [ ] Cloudflare Tunnel from CT 700; DNS + TLS for `scheduler.icelinequadrinks.com`
+- [ ] Only AFTER this lands: emails may include links back to the app, preference/unsubscribe URLs, "view in browser," etc.
+
+### 3.6 Twilio SMS
+- [ ] Twilio account + phone number; creds in LXC `.env`
+- [ ] Outbox rows with `channel='sms'`
+- [ ] Decide replies policy (forward to Bob? auto-respond?). Record opt-in source per employee before first send.
+- [ ] Quiet hours: don't deliver SMS between 9pm–7am local
+
+### 3.7 DaySmart / Dash Integration *(after first bulletin proves the workflow)*
+- [ ] Server-side helper calling the `dash` skill / API to fetch ice activity for a date range
+- [ ] Per-day cache to avoid re-fetching during preview iterations
+- [ ] Layered into the bulletin's per-day content (program names + times only — keep scannable)
+- [ ] Optional: "Today on the ice" widget on manager view
+
+### 3.8 Push Notifications (PWA) — *deferred indefinitely*
+- Lower priority than email/SMS. Reconsider only if PWA install adoption proves out.
 
 ### Build order when ready
-1. 3.0 prerequisites (email column, UI, OAuth scope)
-2. 3.1 weekly bulletin without DaySmart (just staff/office hours)
-3. 3.4 layer DaySmart program data into the bulletin
-4. 3.2 change-alert tracking + send button
-5. Twilio SMS as a parallel channel for both 3.1 and 3.2
-6. *Separate track:* 3.5 public-facing + Phase 7.1 manager auth
+1. **Phase 0** safety fixes (in progress — see top of doc)
+2. **3.0** schema + backup script
+3. **3.1** snapshot foundation + `/employee` reads from snapshots
+4. **3.2 + 3.3** Gmail-only link-free bulletin with publication status, outbox, preview invalidation, resend
+5. **Nightly off-box backups + restore drill** (see Phase 7.4)
+6. **3.5** manager auth + public infra
+7. **3.4** change alerts via snapshot diff + outbox
+8. **3.6** Twilio SMS as parallel channel
+9. **3.7** DaySmart integration
+10. (Deferred: 3.8 push)
 
 ---
 
@@ -286,32 +361,43 @@ Ava can't work Saturday → Posts shift as "needs coverage"
 - [ ] Manager (can edit schedule, approve requests)
 - [ ] Employee (view schedule, submit requests only)
 
-### 7.3 Audit Log
-- [ ] Who changed what, when
-- [ ] "Bob changed Ava's Saturday shift at 3:42 PM"
-- [ ] Exportable for records
+### 7.3 Publication & Save History (replaces full audit log)
+- [ ] Last N schedule snapshots before each accepted save (history-lite)
+- [ ] Publication history: who sent which bulletin/alert when, with delivery summary
+- [ ] *Not building:* full who-changed-what audit log — overkill for a 7-person staff. Re-evaluate if compliance ever demands it.
+
+### 7.4 Backup & Recovery
+- [ ] Nightly SQLite backup (`.backup` API or VACUUM INTO) inside CT 700
+- [ ] Off-LXC copy: rsync to Synology `badamsphotos` over Tailscale, OR push to Google Drive via `iceline_auth.py`
+- [ ] Documented restore drill: "what to run if the LXC dies tomorrow"
+- [ ] Treat backups as sensitive — they contain employee phone numbers and (after Phase 3) emails
 
 ---
 
 ## Implementation Priority
 
-**Do First (Biggest Impact) — revised April 2026:**
-1. **Weekly Bulletin email (3.1) + DaySmart integration (3.4)** — replaces Bob's manual weekly email, biggest day-to-day pain
-2. Change Alerts (3.2)
-3. Employee PIN login (1.1)
-4. Time-off requests (1.3)
-5. Availability submission (1.2)
-6. Availability overlay on schedule (2.1)
+**Do First — revised again post-Codex review (April 2026):**
+1. **Phase 0 safety fixes** (concurrency/version, CORS, disable backup import, copy-week ID fix) — non-negotiable foundation
+2. **3.0 + 3.1** — schema + snapshot model + `/employee` reads from snapshots
+3. **3.2 + 3.3** — link-free Gmail bulletin with outbox + preview invalidation + resend
+4. **Phase 7.4** — nightly off-box backup + restore drill
+5. **3.5** — manager auth + public-facing infra
+6. **3.4** — change alerts (depends on snapshot infra)
 
 **Do Second (Quality of Life):**
-7. Pending requests panel (2.2)
-8. Push notifications (3.3)
-9. Coverage warnings (2.3)
+7. Employee PIN login (1.1)
+8. Time-off requests (1.3)
+9. **3.6** Twilio SMS as parallel channel
+10. Availability submission (1.2)
+11. **3.7** DaySmart integration into bulletin
+12. Availability overlay on schedule (2.1)
+13. Pending requests panel (2.2)
+14. Coverage warnings (2.3)
 
 **Do Third (Differentiation):**
-10. Shift swapping (Phase 4)
-11. Manager authentication (7.1) + public-facing (3.5) — paired
-12. Reporting (Phase 6)
+15. Shift swapping (Phase 4)
+16. Reporting (Phase 6)
+17. Recurring weekly templates (cleaner replacement for "copy last week")
 
 ---
 
@@ -474,4 +560,4 @@ DELETE /api/push/unsubscribe
 
 ---
 
-*Last updated: April 2026 (Phase 3 expanded with concrete bulletin/change-alert design + DaySmart integration)*
+*Last updated: April 2026 — post dual-AI review (Claude + Codex). Added Phase 0 safety fixes, rewrote Phase 3 with snapshot model + outbox architecture, added Phase 7.4 backup automation.*
