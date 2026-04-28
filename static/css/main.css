@@ -686,6 +686,99 @@ body {
     color: #666;
 }
 
+/* Hidden Employees Section */
+.employee-row.hidden-historical td {
+    opacity: 0.65;
+}
+
+.employee-row.hidden-historical .employee-name {
+    font-style: italic;
+}
+
+.hidden-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 6px;
+    background: #f5f5f5;
+    color: #888;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.hidden-section-header td {
+    background: #fafafa;
+    color: #666;
+    cursor: pointer;
+    padding: 10px 12px;
+    border-top: 1px solid #e0e0e0;
+    user-select: none;
+    font-weight: 500;
+    transition: background var(--transition-fast);
+}
+
+.hidden-section-header td:hover {
+    background: #f0f0f0;
+}
+
+.hidden-toggle-arrow {
+    display: inline-block;
+    margin-right: 6px;
+    color: #999;
+    font-size: 10px;
+}
+
+.hidden-section-hint {
+    font-weight: 400;
+    color: #999;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.hidden-employee-row td {
+    background: #fcfcfc;
+    padding: 8px 12px 8px 32px;
+    color: #666;
+    border-top: 1px solid #f0f0f0;
+}
+
+.hidden-emp-name {
+    font-weight: 500;
+    color: #333;
+}
+
+.hidden-emp-section {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 1px 6px;
+    background: #eee;
+    color: #777;
+    border-radius: 3px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.hidden-emp-restore {
+    float: right;
+    padding: 4px 12px;
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all var(--transition-fast);
+}
+
+.hidden-emp-restore:hover {
+    background: #c8e6c9;
+    border-color: #a5d6a7;
+}
+
 /* =============================================================================
    OFFICE HOURS & EVENTS
    ============================================================================= */

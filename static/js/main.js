@@ -26,6 +26,7 @@ const State = {
     undoStack: [],
     redoStack: [],
     currentEdit: null,
+    hiddenSectionOpen: false,
 };
 
 let scheduleData = {
@@ -156,6 +157,7 @@ async function loadSchedule(weekStart) {
             managers: data.managers,
             zakReilly: data.zakReilly,
             employees: data.employees,
+            hiddenEmployees: data.hiddenEmployees || [],
             officeHours: data.officeHours,
             events: data.events
         };
@@ -1146,22 +1148,40 @@ async function saveEmployee(section, empIndex) {
     }
 }
 
-async function deleteEmployee(empIndex) {
+async function hideEmployee(empIndex) {
     const emp = scheduleData.employees[empIndex];
-    
-    if (!confirm(`Delete ${emp.name}?`)) return;
-    
+
+    const msg = `Hide ${emp.name} from new schedules?\n\n` +
+        `Their past hours stay visible on the weeks they worked. ` +
+        `You can bring them back anytime from the Hidden Employees section at the bottom of the staff list.`;
+    if (!confirm(msg)) return;
+
     try {
         await fetch(`${Config.API_BASE}/api/employees/${emp.id}`, {
             method: 'DELETE'
         });
-        
-        scheduleData.employees.splice(empIndex, 1);
+
+        await loadSchedule(State.currentWeekStart);
         renderSchedule();
         setupEventListeners();
     } catch (error) {
-        console.error('Error deleting employee:', error);
-        alert('Failed to delete employee');
+        console.error('Error hiding employee:', error);
+        alert('Failed to hide employee');
+    }
+}
+
+async function restoreEmployee(empId) {
+    try {
+        const response = await fetch(`${Config.API_BASE}/api/employees/${empId}/restore`, {
+            method: 'POST'
+        });
+        if (!response.ok) throw new Error('Restore failed');
+        await loadSchedule(State.currentWeekStart);
+        renderSchedule();
+        setupEventListeners();
+    } catch (error) {
+        console.error('Error restoring employee:', error);
+        alert('Failed to bring employee back');
     }
 }
 
@@ -1565,28 +1585,79 @@ function renderEmployeeRows() {
             </td>
         </tr>
     `;
-    
+
+    html += renderHiddenEmployeesSection();
+
     return html;
 }
 
+function renderHiddenEmployeesSection() {
+    const hidden = scheduleData.hiddenEmployees || [];
+    if (hidden.length === 0) return '';
+
+    const expanded = State.hiddenSectionOpen ? 'open' : '';
+    const arrow = State.hiddenSectionOpen ? '▼' : '▶';
+
+    let rows = '';
+    if (State.hiddenSectionOpen) {
+        hidden.forEach(emp => {
+            rows += `
+                <tr class="hidden-employee-row">
+                    <td colspan="16">
+                        <span class="hidden-emp-name">${emp.name}</span>
+                        ${emp.phone ? `<span class="employee-phone">${emp.phone}</span>` : ''}
+                        <span class="hidden-emp-section">${emp.section}</span>
+                        <button class="hidden-emp-restore" onclick="restoreEmployee(${emp.id})">Bring back</button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    return `
+        <tr class="hidden-section-header ${expanded}" onclick="toggleHiddenSection()">
+            <td colspan="16">
+                <span class="hidden-toggle-arrow">${arrow}</span>
+                Hidden Employees (${hidden.length})
+                <span class="hidden-section-hint">— seasonal staff you've hidden from new schedules</span>
+            </td>
+        </tr>
+        ${rows}
+    `;
+}
+
+function toggleHiddenSection() {
+    State.hiddenSectionOpen = !State.hiddenSectionOpen;
+    renderSchedule();
+    setupEventListeners();
+}
+
 function renderSingleEmployeeRow(emp, section, empIndex) {
-    const draggable = section === 'staff' ? 'draggable="true"' : '';
-    let html = `<tr class="employee-row ${section}" ${draggable} data-section="${section}" data-index="${empIndex}">`;
-    
+    const isHiddenHistorical = emp.active === false;
+    const draggable = section === 'staff' && !isHiddenHistorical ? 'draggable="true"' : '';
+    const hiddenClass = isHiddenHistorical ? 'hidden-historical' : '';
+    let html = `<tr class="employee-row ${section} ${hiddenClass}" ${draggable} data-section="${section}" data-index="${empIndex}">`;
+
     const hasNote = emp.note;
     const noteClass = hasNote ? 'has-note' : '';
     const noteTitle = hasNote || 'Add note';
-    
+
+    const hiddenBadge = isHiddenHistorical
+        ? '<span class="hidden-badge" title="This employee is hidden. Past shifts on this week are still shown.">hidden</span>'
+        : '';
+    const showHideBtn = section === 'staff' && !isHiddenHistorical;
+
     html += `
         <td>
-            ${section === 'staff' ? '<span class="drag-handle" title="Drag to reorder">☰</span>' : ''}
+            ${section === 'staff' && !isHiddenHistorical ? '<span class="drag-handle" title="Drag to reorder">☰</span>' : ''}
             <span class="employee-name">${emp.name}</span>
+            ${hiddenBadge}
             ${emp.phone ? `<span class="employee-phone">${emp.phone}</span>` : ''}
             <span class="employee-note-icon ${noteClass}" onclick="openNoteModal('${section}', ${empIndex})" title="${noteTitle}">📝</span>
             <div class="employee-actions">
                 <button class="emp-action-btn copy" onclick="copyEmployeePreviousWeek('${section}', ${empIndex})" title="Copy this employee's previous week">📋</button>
                 <button class="emp-action-btn edit" onclick="openEmployeeModal('${section}', ${empIndex})" title="Edit">✎</button>
-                ${section === 'staff' ? `<button class="emp-action-btn delete" onclick="deleteEmployee(${empIndex})" title="Delete">✕</button>` : ''}
+                ${showHideBtn ? `<button class="emp-action-btn delete" onclick="hideEmployee(${empIndex})" title="Hide from new schedules">✕</button>` : ''}
             </div>
         </td>
     `;

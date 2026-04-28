@@ -303,15 +303,17 @@ def build_schedule_response(week_start_str):
     
     schedule = get_or_create_schedule(week_start_str)
     schedule_id = schedule['id']
-    
-    # Get active employees ordered by section and sort_order
+
+    # Show employees who are currently active OR who have shifts on this week
+    # (so past weeks still show seasonal staff who worked then, even after they're hidden)
     cursor.execute('''
-        SELECT * FROM employees 
-        WHERE active = 1 
-        ORDER BY 
+        SELECT * FROM employees
+        WHERE active = 1
+           OR id IN (SELECT DISTINCT employee_id FROM shifts WHERE schedule_id = ?)
+        ORDER BY
             CASE section WHEN 'manager' THEN 1 WHEN 'zak' THEN 2 WHEN 'staff' THEN 3 END,
             sort_order
-    ''')
+    ''', (schedule_id,))
     employees = [dict(row) for row in cursor.fetchall()]
     
     # Get shifts as lookup dictionary
@@ -350,6 +352,7 @@ def build_schedule_response(week_start_str):
             'id': emp['id'],
             'name': emp['name'],
             'phone': emp['phone'] or '',
+            'active': bool(emp['active']),
             'shifts': [shifts.get((emp['id'], i)) for i in range(7)],
             'note': notes.get(emp['id'], '')
         }
@@ -358,7 +361,14 @@ def build_schedule_response(week_start_str):
     zak_list = [e for e in employees if e['section'] == 'zak']
     zak = build_employee(zak_list[0]) if zak_list else None
     staff = [build_employee(e) for e in employees if e['section'] == 'staff']
-    
+
+    cursor.execute('''
+        SELECT id, name, phone, section FROM employees
+        WHERE active = 0
+        ORDER BY section, name
+    ''')
+    hidden_employees = [dict(row) for row in cursor.fetchall()]
+
     return {
         'weekTitle': schedule['week_title'],
         'weekStart': schedule['week_start'],
@@ -366,6 +376,7 @@ def build_schedule_response(week_start_str):
         'managers': managers,
         'zakReilly': zak,
         'employees': staff,
+        'hiddenEmployees': hidden_employees,
         'officeHours': office_hours,
         'events': [events_by_day[i] for i in range(7)]
     }
@@ -645,7 +656,8 @@ def register_routes(app):
     
     @app.route('/api/employees/<int:emp_id>', methods=['DELETE'])
     def delete_employee(emp_id):
-        """Soft delete an employee"""
+        """Hide an employee from new schedules. Past weeks where they had shifts
+        still show them; the Hidden Employees panel can bring them back."""
         try:
             db = get_db()
             cursor = db.cursor()
@@ -655,9 +667,30 @@ def register_routes(app):
             )
             db.commit()
             return jsonify({'success': True})
-        
+
         except Exception as e:
-            logging.error(f"Error deleting employee: {e}")
+            logging.error(f"Error hiding employee: {e}")
+            return jsonify({'error': str(e)}), 400
+
+    @app.route('/api/employees/<int:emp_id>/restore', methods=['POST'])
+    def restore_employee(emp_id):
+        """Bring a hidden employee back into active scheduling."""
+        try:
+            db = get_db()
+            cursor = db.cursor()
+            cursor.execute(
+                'UPDATE employees SET active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                (emp_id,)
+            )
+            cursor.execute('SELECT * FROM employees WHERE id = ?', (emp_id,))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'error': 'Employee not found'}), 404
+            db.commit()
+            return jsonify(dict(row))
+
+        except Exception as e:
+            logging.error(f"Error restoring employee: {e}")
             return jsonify({'error': str(e)}), 400
     
     # -------------------------------------------------------------------------
