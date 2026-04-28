@@ -1128,6 +1128,9 @@ body.employee-view .hours-cell,
 body.employee-view .hours-header,
 body.employee-view .legend,
 body.employee-view .add-employee-row,
+body.employee-view .hidden-section-header,
+body.employee-view .hidden-employee-row,
+body.employee-view .hidden-badge,
 body.employee-view .toolbar-left .action-btn,
 body.employee-view .undo-redo-btns,
 body.employee-view .auto-save-status,
@@ -1161,11 +1164,14 @@ body.employee-view .view-indicator {
         font-size: 8pt;
     }
 
-    .toolbar, 
-    .legend, 
+    .toolbar,
+    .legend,
     .view-indicator,
     .coverage-container,
-    .add-employee-row {
+    .add-employee-row,
+    .hidden-section-header,
+    .hidden-employee-row,
+    .hidden-badge {
         display: none !important;
     }
     
