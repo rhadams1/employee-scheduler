@@ -1440,4 +1440,7 @@ def register_routes(app):
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=Config.DEBUG)
+    # threaded=True lets the dev server handle the headless-Chromium self-request
+    # (issued while an export-pdf request is in flight) without deadlocking.
+    # Production gunicorn (--workers 9) already handles concurrent requests.
+    app.run(host='0.0.0.0', port=5001, debug=Config.DEBUG, threaded=True)
