@@ -134,6 +134,25 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### PDF export (headless Chromium)
+
+The "Export PDF" button renders the schedule page with headless Chromium so the
+PDF matches the on-screen print view. After `pip install -r requirements.txt`,
+install the browser and its system libraries once:
+
+```bash
+source venv/bin/activate
+playwright install chromium
+playwright install-deps chromium   # apt system libraries (run as root if needed)
+```
+
+Footprint is ~150-300 MB. If Chromium is missing or fails, the endpoint
+automatically falls back to the plain FPDF generator, so a missing browser will
+not break the button — it just produces the unbranded layout.
+
+The page is fetched from `PDF_RENDER_BASE_URL` (default `http://127.0.0.1:5001`).
+Override it if the service binds to a different host/port.
+
 ### Create Environment File
 
 ```bash
