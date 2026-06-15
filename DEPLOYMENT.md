@@ -16,15 +16,15 @@ Complete guide for deploying Ice Line Employee Scheduler to an LXC container on 
    - Go to your Proxmox node
    - Click "Create CT"
    - OS Template: Choose `ubuntu-22.04-standard` or `debian-12-standard`
-   - VM ID: Auto-assigned (e.g., 100)
+   - VM ID: `700`
    - Hostname: `scheduler` (or your preference)
    - Password: Set root password
 
 2. **Resource Configuration**
-   - Memory: 512 MB (minimum), 1 GB recommended
-   - CPU cores: 1-2 cores
-   - Disk: 10 GB (plenty for app + database)
-   - Network: Bridge to your network, static IP recommended
+   - Memory: 4 GB (sized for Claude Code)
+   - CPU cores: 4 cores
+   - Disk: 40 GB (app + database + Claude Code workspace)
+   - Network: Bridge to your network, DHCP
 
 3. **Start Container**
    - Start the container after creation
@@ -33,15 +33,17 @@ Complete guide for deploying Ice Line Employee Scheduler to an LXC container on 
 ### Using Command Line (SSH into Proxmox)
 
 ```bash
-pct create 100 local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst \
+pct create 700 local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst \
   --hostname scheduler \
-  --memory 1024 \
-  --cores 2 \
-  --net0 name=eth0,bridge=vmbr0,ip=192.168.1.100/24,gw=192.168.1.1 \
+  --memory 4096 \
+  --cores 4 \
+  --net0 name=eth0,bridge=vmbr0,ip=dhcp \
   --storage local-lvm \
-  --rootfs local-lvm:10 \
+  --rootfs local-lvm:40 \
   --unprivileged 0
 ```
+
+> **Note:** This container is sized to run Claude Code for remote development/maintenance (4GB RAM, 4 cores, 40GB disk).
 
 ## Step 2: Initial Container Setup
 
@@ -55,7 +57,44 @@ ssh root@<container-ip>
 
 ```bash
 apt update && apt upgrade -y
-apt install -y python3 python3-pip python3-venv nginx sqlite3 git
+apt install -y python3 python3-pip python3-venv nginx sqlite3 git curl
+```
+
+### Install Node.js and Claude Code
+
+Claude Code enables remote development and maintenance of this application.
+
+```bash
+# Install Node.js 20.x
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
+
+# Verify installation
+node --version  # Should be v20.x
+npm --version
+
+# Install Claude Code globally
+npm install -g @anthropic-ai/claude-code
+
+# Verify Claude Code installation
+claude --version
+```
+
+### Configure Claude Code
+
+```bash
+# Set your Anthropic API key (add to /etc/environment for persistence)
+echo 'ANTHROPIC_API_KEY="your-api-key-here"' >> /etc/environment
+
+# Or add to the scheduler user's profile
+echo 'export ANTHROPIC_API_KEY="your-api-key-here"' >> /home/scheduler/.bashrc
+```
+
+To use Claude Code after setup:
+```bash
+su - scheduler
+cd /home/scheduler/employee-scheduler
+claude
 ```
 
 ### Create Application User
@@ -126,7 +165,7 @@ WorkingDirectory=/home/scheduler/employee-scheduler
 Environment="PATH=/home/scheduler/employee-scheduler/venv/bin"
 EnvironmentFile=/home/scheduler/employee-scheduler/.env
 ExecStart=/home/scheduler/employee-scheduler/venv/bin/gunicorn \
-    --workers 4 \
+    --workers 9 \
     --worker-class sync \
     --bind 127.0.0.1:5001 \
     --timeout 120 \
@@ -448,11 +487,10 @@ sudo chmod 644 /home/scheduler/employee-scheduler/schedule.db
 Adjust workers based on CPU cores:
 ```bash
 # Formula: (2 × CPU cores) + 1
-# For 2 cores: 5 workers
-# For 4 cores: 9 workers
+# For 4 cores (default container): 9 workers
 ```
 
-Edit `/etc/systemd/system/employee-scheduler.service` and update `--workers` value.
+Edit `/etc/systemd/system/employee-scheduler.service` and update `--workers 9`.
 
 ### Nginx Caching (Optional)
 

@@ -4,6 +4,7 @@ Production-ready version with proper error handling and configuration
 """
 
 import os
+import calendar as cal
 import logging
 from datetime import datetime, timedelta, date
 from io import BytesIO
@@ -1100,6 +1101,160 @@ def register_routes(app):
 
         except Exception as e:
             logging.error(f"Error exporting PDF: {e}")
+            return jsonify({'error': str(e)}), 400
+
+    @app.route('/api/timeoff-calendars', methods=['GET'])
+    def export_timeoff_calendars():
+        """Generate blank printable monthly calendars for staff time-off requests.
+
+        One page per month. Each day cell has AM / PM / All Day checkboxes plus a
+        write-in line for specific times. Defaults to the next 3 months; override
+        with ?start=YYYY-MM and ?months=N.
+        """
+        try:
+            # Determine the starting month (default: next calendar month).
+            start_param = request.args.get('start')
+            if start_param:
+                start_year, start_month = (int(x) for x in start_param.split('-'))
+            else:
+                today = date.today()
+                start_year = today.year + (1 if today.month == 12 else 0)
+                start_month = 1 if today.month == 12 else today.month + 1
+
+            months = max(1, min(12, request.args.get('months', default=3, type=int)))
+
+            # Build the list of (year, month) pairs.
+            month_list = []
+            y, m = start_year, start_month
+            for _ in range(months):
+                month_list.append((y, m))
+                m += 1
+                if m > 12:
+                    m, y = 1, y + 1
+
+            pdf = FPDF(orientation='P', unit='mm', format='Letter')
+            pdf.set_auto_page_break(auto=False)
+
+            logo_path = os.path.join(app.static_folder, 'Ice_Line_Logo.png')
+            has_logo = os.path.exists(logo_path)
+
+            page_w = 215.9      # Letter width (mm)
+            margin = 10
+            usable_w = page_w - 2 * margin
+            col_w = usable_w / 7
+            weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+            def draw_checkbox(x, y, label, size=3.2):
+                pdf.rect(x, y, size, size)
+                pdf.set_xy(x + size + 1, y - 0.6)
+                pdf.set_font('Helvetica', '', 6.5)
+                pdf.cell(col_w / 2, size + 1.2, label, 0, 0, 'L')
+
+            for (year, month) in month_list:
+                pdf.add_page()
+
+                # ---- Header ----
+                if has_logo:
+                    pdf.image(logo_path, x=margin, y=8, w=22)
+                pdf.set_xy(margin, 9)
+                pdf.set_font('Helvetica', 'B', 16)
+                pdf.cell(0, 8, 'Ice Line Quad Rinks - Time-Off Request', 0, 1, 'C')
+                pdf.set_x(margin)
+                pdf.set_font('Helvetica', 'B', 13)
+                pdf.cell(0, 7, f"{cal.month_name[month]} {year}", 0, 1, 'C')
+
+                # Name / submitted lines
+                pdf.ln(1)
+                pdf.set_x(margin)
+                pdf.set_font('Helvetica', '', 10)
+                pdf.cell(usable_w * 0.6, 7, 'Name: ______________________________', 0, 0, 'L')
+                pdf.cell(usable_w * 0.4, 7, 'Date submitted: __________________', 0, 1, 'L')
+
+                # Instructions box
+                pdf.ln(1)
+                instr_x, instr_y = margin, pdf.get_y()
+                instr_h = 25
+                pdf.set_fill_color(238, 242, 248)
+                pdf.set_draw_color(150, 150, 150)
+                pdf.rect(instr_x, instr_y, usable_w, instr_h, 'DF')
+                pdf.set_xy(instr_x + 2, instr_y + 1.5)
+                pdf.set_font('Helvetica', 'B', 9)
+                pdf.cell(0, 4.5, 'On each day you need off, mark one:', 0, 1, 'L')
+                pdf.set_font('Helvetica', '', 8.5)
+                bullets = [
+                    ('All Day', 'check this box for the whole day off'),
+                    ('AM  or  PM', 'check one for just the morning or just the afternoon/evening'),
+                    ('Line at the bottom', 'write exact hours if needed (e.g. "off after 2:00")'),
+                ]
+                for label, desc in bullets:
+                    pdf.set_x(instr_x + 4)
+                    pdf.set_font('Helvetica', 'B', 8.5)
+                    pdf.cell(34, 4, f"-  {label}", 0, 0, 'L')
+                    pdf.set_font('Helvetica', '', 8.5)
+                    pdf.cell(0, 4, desc, 0, 1, 'L')
+                pdf.set_x(instr_x + 2)
+                pdf.set_font('Helvetica', 'I', 8)
+                pdf.cell(0, 4, 'Return this sheet to the office by the posted deadline.', 0, 1, 'L')
+                pdf.set_draw_color(0, 0, 0)
+
+                # ---- Calendar grid ----
+                grid_top = instr_y + instr_h + 3
+                bottom_margin = 10
+                wd_header_h = 6
+
+                weeks = cal.Calendar(firstweekday=6).monthdayscalendar(year, month)
+                page_h = 279.4  # Letter height (mm)
+                grid_h = page_h - grid_top - bottom_margin
+                row_h = (grid_h - wd_header_h) / len(weeks)
+
+                # Weekday header
+                pdf.set_xy(margin, grid_top)
+                pdf.set_font('Helvetica', 'B', 9)
+                pdf.set_fill_color(30, 58, 95)
+                pdf.set_text_color(255, 255, 255)
+                for name in weekday_names:
+                    pdf.cell(col_w, wd_header_h, name, 1, 0, 'C', True)
+                pdf.set_text_color(0, 0, 0)
+
+                # Day cells
+                for w_idx, week in enumerate(weeks):
+                    cell_y = grid_top + wd_header_h + w_idx * row_h
+                    for d_idx, daynum in enumerate(week):
+                        cell_x = margin + d_idx * col_w
+                        if daynum == 0:
+                            pdf.set_fill_color(245, 245, 245)
+                            pdf.rect(cell_x, cell_y, col_w, row_h, 'DF')
+                            pdf.set_fill_color(255, 255, 255)
+                            continue
+                        pdf.rect(cell_x, cell_y, col_w, row_h)
+                        # Day number
+                        pdf.set_xy(cell_x + 1, cell_y + 0.8)
+                        pdf.set_font('Helvetica', 'B', 11)
+                        pdf.cell(col_w - 2, 5, str(daynum), 0, 0, 'L')
+                        # Checkboxes
+                        cb_y = cell_y + 8
+                        draw_checkbox(cell_x + 2, cb_y, 'AM')
+                        draw_checkbox(cell_x + col_w / 2 + 1, cb_y, 'PM')
+                        draw_checkbox(cell_x + 2, cb_y + 6, 'All Day')
+                        # Write-in line for specific times
+                        line_y = cell_y + row_h - 3.5
+                        pdf.set_draw_color(180, 180, 180)
+                        pdf.line(cell_x + 2, line_y, cell_x + col_w - 2, line_y)
+                        pdf.set_draw_color(0, 0, 0)
+
+            filename = (
+                f"timeoff_{cal.month_abbr[month_list[0][1]]}-"
+                f"{cal.month_abbr[month_list[-1][1]]}_{month_list[0][0]}.pdf"
+            )
+
+            output = BytesIO()
+            pdf.output(output)
+            output.seek(0)
+            return send_file(output, mimetype='application/pdf',
+                             as_attachment=True, download_name=filename)
+
+        except Exception as e:
+            logging.error(f"Error generating time-off calendars: {e}")
             return jsonify({'error': str(e)}), 400
 
     # -------------------------------------------------------------------------

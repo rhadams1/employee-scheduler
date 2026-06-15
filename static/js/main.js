@@ -703,6 +703,11 @@ function exportToPDF() {
     window.location.href = `${Config.API_BASE}/api/schedule/${State.currentWeekStart}/export-pdf`;
 }
 
+function exportTimeOffCalendars() {
+    // Blank monthly calendars (next 3 months) for staff to mark up by hand.
+    window.location.href = `${Config.API_BASE}/api/timeoff-calendars`;
+}
+
 // =============================================================================
 // EVENT LISTENERS
 // =============================================================================
@@ -1542,6 +1547,9 @@ function renderToolbar() {
                 </button>
                 <button class="action-btn" onclick="exportToPDF()">
                     <span class="icon">📄</span> PDF
+                </button>
+                <button class="action-btn" onclick="exportTimeOffCalendars()" title="Blank monthly calendars (next 3 months) for staff time-off requests">
+                    <span class="icon">🗓️</span> Time-Off Sheets
                 </button>
                 <button class="action-btn" onclick="window.print()">
                     <span class="icon">🖨️</span> Print
