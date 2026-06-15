@@ -31,7 +31,9 @@ class Config:
     DATABASE = os.environ.get('DATABASE_PATH', 'schedule.db')
     DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     BACKUP_IMPORT_ENABLED = os.environ.get('BACKUP_IMPORT_ENABLED', 'false').lower() == 'true'
-    
+    PDF_RENDER_BASE_URL = os.environ.get('PDF_RENDER_BASE_URL', 'http://127.0.0.1:5001')
+    PDF_RENDER_TIMEOUT_MS = int(os.environ.get('PDF_RENDER_TIMEOUT_MS', '10000'))
+
     # Schedule configuration
     WEEK_START_DAY = 'wednesday'  # Schedule week starts on Wednesday
     DEFAULT_OFFICE_OPEN = '8:00 AM'
@@ -423,6 +425,14 @@ def register_error_handlers(app):
 # PDF HELPER
 # =============================================================================
 
+def schedule_pdf_filename(data):
+    """Build the download filename for a schedule PDF: schedule_<d1>-<yy>_to_<d2>-<yy>.pdf"""
+    d1 = data['days'][0]['date'].replace('/', '-')
+    d2 = data['days'][6]['date'].replace('/', '-')
+    year = data['weekTitle'].split(', ')[-1][-2:]
+    return f"schedule_{d1}-{year}_to_{d2}-{year}.pdf"
+
+
 def build_schedule_pdf_fpdf(data):
     """Render a schedule PDF with FPDF. Returns (pdf_bytes, filename).
 
@@ -534,15 +544,59 @@ def build_schedule_pdf_fpdf(data):
         pdf.cell(day_col_w, row_h, event_text, 1, 0, 'C', False)
     pdf.cell(hours_col_w, row_h, '', 1, 1, 'C', False)
 
-    d1 = data['days'][0]['date'].replace('/', '-')
-    d2 = data['days'][6]['date'].replace('/', '-')
-    year = data['weekTitle'].split(', ')[-1][-2:]
-    filename = f"schedule_{d1}-{year}_to_{d2}-{year}.pdf"
+    filename = schedule_pdf_filename(data)
 
     output = BytesIO()
     pdf.output(output)
     output.seek(0)
     return output.read(), filename
+
+
+def build_schedule_pdf_chromium(week_start, base_url, timeout_ms):
+    """Render the live schedule page to PDF with headless Chromium.
+
+    Returns PDF bytes. Raises on any failure (caller falls back to FPDF).
+    """
+    from playwright.sync_api import sync_playwright
+
+    # A4 landscape printable area in inches (8.27 x 11.69 in), minus 0.25in margins.
+    margin_in = 0.25
+    page_w_in = 11.69 - 2 * margin_in
+    page_h_in = 8.27 - 2 * margin_in
+    url = f"{base_url}/?print=1&week={week_start}"
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=['--no-sandbox'])
+        try:
+            page = browser.new_page()
+            page.emulate_media(media='print')
+            page.goto(url, wait_until='networkidle', timeout=timeout_ms)
+            page.wait_for_function('window.__printReady === true', timeout=timeout_ms)
+
+            # Measure full rendered content at scale 1 (CSS px @ 96dpi).
+            metrics = page.evaluate(
+                "() => ({ w: document.documentElement.scrollWidth,"
+                " h: document.documentElement.scrollHeight })"
+            )
+            content_w_in = metrics['w'] / 96.0
+            content_h_in = metrics['h'] / 96.0
+
+            scale = min(page_w_in / content_w_in, page_h_in / content_h_in, 1.0)
+            scale = max(scale, 0.1)  # Playwright clamps to [0.1, 2.0].
+
+            pdf_bytes = page.pdf(
+                format='A4',
+                landscape=True,
+                scale=scale,
+                print_background=True,
+                margin={
+                    'top': f'{margin_in}in', 'bottom': f'{margin_in}in',
+                    'left': f'{margin_in}in', 'right': f'{margin_in}in',
+                },
+            )
+            return pdf_bytes
+        finally:
+            browser.close()
 
 
 # =============================================================================
@@ -1084,10 +1138,24 @@ def register_routes(app):
 
     @app.route('/api/schedule/<week_start>/export-pdf', methods=['GET'])
     def export_schedule_pdf(week_start):
-        """Export schedule to PDF (FPDF fallback path; Chromium added in Task 3)."""
+        """Export schedule to PDF. Prefers headless Chromium (pixel-matches the
+        on-screen print view); falls back to the FPDF generator if Chromium is
+        unavailable or errors."""
         try:
             data = build_schedule_response(week_start)
-            pdf_bytes, filename = build_schedule_pdf_fpdf(data)
+            filename = schedule_pdf_filename(data)
+
+            pdf_bytes = None
+            try:
+                pdf_bytes = build_schedule_pdf_chromium(
+                    week_start,
+                    Config.PDF_RENDER_BASE_URL,
+                    Config.PDF_RENDER_TIMEOUT_MS,
+                )
+            except Exception as e:
+                logging.warning(f"Chromium PDF render failed, using FPDF fallback: {e}")
+                pdf_bytes, filename = build_schedule_pdf_fpdf(data)
+
             return send_file(
                 BytesIO(pdf_bytes),
                 mimetype='application/pdf',
