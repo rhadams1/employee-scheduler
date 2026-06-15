@@ -92,22 +92,40 @@ const holidays = {
 
 document.addEventListener('DOMContentLoaded', async function() {
     loadDarkModePreference();
-    
-    try {
-        const response = await fetch(`${Config.API_BASE}/api/current-week`);
-        const data = await response.json();
-        State.currentWeekStart = data.weekStart;
-        console.log('Current week from server:', data);
-    } catch (error) {
-        console.error('Failed to get current week:', error);
-        State.currentWeekStart = getWeekStartFallback(new Date());
+
+    const params = new URLSearchParams(window.location.search);
+    const isPrintMode = params.get('print') === '1';
+    const weekParam = params.get('week');
+
+    if (weekParam) {
+        State.currentWeekStart = weekParam;
+    } else {
+        try {
+            const response = await fetch(`${Config.API_BASE}/api/current-week`);
+            const data = await response.json();
+            State.currentWeekStart = data.weekStart;
+            console.log('Current week from server:', data);
+        } catch (error) {
+            console.error('Failed to get current week:', error);
+            State.currentWeekStart = getWeekStartFallback(new Date());
+        }
     }
-    
+
     await loadSchedule(State.currentWeekStart);
     renderSchedule();
+
+    if (isPrintMode) {
+        // Signal to headless Chromium that the schedule is fully rendered.
+        document.body.classList.add('print-mode');
+        document.body.dataset.printReady = '1';
+        window.__printReady = true;
+        console.log('Print mode ready for week', State.currentWeekStart);
+        return; // Skip interactive listeners/shortcuts when generating a PDF.
+    }
+
     setupEventListeners();
     setupKeyboardShortcuts();
-    
+
     console.log('Schedule loaded:', scheduleData);
 });
 
