@@ -572,8 +572,11 @@ def build_schedule_pdf_chromium(week_start, base_url, timeout_ms):
         try:
             page = browser.new_page()
             page.emulate_media(media='print')
-            # timeout_ms applies to each wait independently (worst case ~2x).
-            page.goto(url, wait_until='networkidle', timeout=timeout_ms)
+            # The readiness flag (set by the page after it renders AND its images
+            # load) is the authoritative "safe to print" signal, so a plain load
+            # wait plus the flag wait is sufficient. timeout_ms applies to each
+            # wait independently.
+            page.goto(url, timeout=timeout_ms)
             page.wait_for_function('window.__printReady === true', timeout=timeout_ms)
 
             # Measure full rendered content at scale 1 (CSS px @ 96dpi).
@@ -1147,6 +1150,13 @@ def register_routes(app):
         on-screen print view); falls back to the FPDF generator if Chromium is
         unavailable or errors."""
         try:
+            # Validate the date format up front: week_start is interpolated into
+            # the URL handed to headless Chromium.
+            try:
+                datetime.strptime(week_start, '%Y-%m-%d')
+            except ValueError:
+                return jsonify({'error': 'Invalid week_start format (expected YYYY-MM-DD)'}), 400
+
             data = build_schedule_response(week_start)
             filename = schedule_pdf_filename(data)
 

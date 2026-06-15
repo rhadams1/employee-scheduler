@@ -111,15 +111,28 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    await loadSchedule(State.currentWeekStart);
+    const loadOk = await loadSchedule(State.currentWeekStart);
     renderSchedule();
 
     if (isPrintMode) {
-        // Signal to headless Chromium that the schedule is fully rendered.
-        document.body.classList.add('print-mode');
-        document.body.dataset.printReady = '1';
-        window.__printReady = true;
-        console.log('Print mode ready for week', State.currentWeekStart);
+        if (loadOk) {
+            // Wait for images (e.g. the Ice Line logo) to finish loading before
+            // signaling readiness, so headless Chromium never prints a logoless page.
+            await Promise.all(
+                Array.from(document.images)
+                    .filter(img => !img.complete)
+                    .map(img => new Promise(resolve => { img.onload = img.onerror = resolve; }))
+            );
+            // Signal to headless Chromium that the schedule is fully rendered.
+            document.body.classList.add('print-mode');
+            document.body.dataset.printReady = '1';
+            window.__printReady = true;
+            console.log('Print mode ready for week', State.currentWeekStart);
+        } else {
+            // Schedule failed to load: leave __printReady unset so the Chromium
+            // render times out and the server falls back to FPDF.
+            console.error('Print mode: schedule failed to load; not signaling ready');
+        }
         return; // Skip interactive listeners/shortcuts when generating a PDF.
     }
 
