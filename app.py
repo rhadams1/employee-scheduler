@@ -559,7 +559,9 @@ def build_schedule_pdf_chromium(week_start, base_url, timeout_ms):
     """
     from playwright.sync_api import sync_playwright
 
-    # A4 landscape printable area in inches (8.27 x 11.69 in), minus 0.25in margins.
+    # A4 landscape printable area in inches, minus 0.25in margins.
+    # landscape=True (set on page.pdf below) rotates A4, so the long edge
+    # (11.69in) is the width and the short edge (8.27in) is the height.
     margin_in = 0.25
     page_w_in = 11.69 - 2 * margin_in
     page_h_in = 8.27 - 2 * margin_in
@@ -570,6 +572,7 @@ def build_schedule_pdf_chromium(week_start, base_url, timeout_ms):
         try:
             page = browser.new_page()
             page.emulate_media(media='print')
+            # timeout_ms applies to each wait independently (worst case ~2x).
             page.goto(url, wait_until='networkidle', timeout=timeout_ms)
             page.wait_for_function('window.__printReady === true', timeout=timeout_ms)
 
@@ -578,6 +581,8 @@ def build_schedule_pdf_chromium(week_start, base_url, timeout_ms):
                 "() => ({ w: document.documentElement.scrollWidth,"
                 " h: document.documentElement.scrollHeight })"
             )
+            if not metrics['w'] or not metrics['h']:
+                raise RuntimeError(f"Print page reported zero dimensions: {metrics}")
             content_w_in = metrics['w'] / 96.0
             content_h_in = metrics['h'] / 96.0
 
