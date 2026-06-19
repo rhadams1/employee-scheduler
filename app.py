@@ -352,6 +352,18 @@ def get_or_create_schedule(week_start_str):
     return dict(schedule)
 
 
+# Fields that must never be serialized into API responses (auth secrets/state).
+_SENSITIVE_EMPLOYEE_FIELDS = ('password_hash', 'pin_hash', 'failed_attempts', 'locked_until')
+
+
+def public_employee(row):
+    """Serialize an employee DB row to a dict with auth-secret fields removed."""
+    d = dict(row)
+    for k in _SENSITIVE_EMPLOYEE_FIELDS:
+        d.pop(k, None)
+    return d
+
+
 def build_schedule_response(week_start_str):
     """Build complete schedule data for API response"""
     db = get_db()
@@ -370,8 +382,8 @@ def build_schedule_response(week_start_str):
             CASE section WHEN 'manager' THEN 1 WHEN 'zak' THEN 2 WHEN 'staff' THEN 3 END,
             sort_order
     ''', (schedule_id,))
-    employees = [dict(row) for row in cursor.fetchall()]
-    
+    employees = [public_employee(row) for row in cursor.fetchall()]
+
     # Get shifts as lookup dictionary
     cursor.execute('SELECT * FROM shifts WHERE schedule_id = ?', (schedule_id,))
     shifts = {
@@ -903,7 +915,7 @@ def register_routes(app):
                WHERE active = 1 
                ORDER BY section, sort_order'''
         )
-        return jsonify([dict(row) for row in cursor.fetchall()])
+        return jsonify([public_employee(row) for row in cursor.fetchall()])
     
     @app.route('/api/employees', methods=['POST'])
     @manager_required
@@ -937,8 +949,8 @@ def register_routes(app):
             
             emp_id = cursor.lastrowid
             cursor.execute('SELECT * FROM employees WHERE id = ?', (emp_id,))
-            employee = dict(cursor.fetchone())
-            
+            employee = public_employee(cursor.fetchone())
+
             db.commit()
             return jsonify(employee), 201
         
@@ -974,12 +986,12 @@ def register_routes(app):
             
             cursor.execute('SELECT * FROM employees WHERE id = ?', (emp_id,))
             row = cursor.fetchone()
-            
+
             if not row:
                 return jsonify({'error': 'Employee not found'}), 404
-            
+
             db.commit()
-            return jsonify(dict(row))
+            return jsonify(public_employee(row))
         
         except Exception as e:
             logging.error(f"Error updating employee: {e}")
@@ -1020,7 +1032,7 @@ def register_routes(app):
             if not row:
                 return jsonify({'error': 'Employee not found'}), 404
             db.commit()
-            return jsonify(dict(row))
+            return jsonify(public_employee(row))
 
         except Exception as e:
             logging.error(f"Error restoring employee: {e}")
