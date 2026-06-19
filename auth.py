@@ -5,8 +5,9 @@ take an explicit sqlite3 connection (row_factory=sqlite3.Row); decorators/sessio
 helpers (added in a later task) use only flask.session.
 """
 from datetime import datetime, timedelta
+from functools import wraps
 
-from flask import current_app
+from flask import current_app, redirect, request, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -91,3 +92,50 @@ def verify_login(conn, identifier, secret, expected_role):
     )
     conn.commit()
     return (None, "locked" if locked_until else "invalid")
+
+
+def login_user(emp_id, role, permanent):
+    session.clear()
+    session["user_id"] = emp_id
+    session["role"] = role
+    session.permanent = permanent
+
+
+def logout_user():
+    session.clear()
+
+
+def current_user():
+    uid = session.get("user_id")
+    if uid is None:
+        return None
+    return {"id": uid, "role": session.get("role")}
+
+
+def _deny(scope):
+    if request.path.startswith("/api/"):
+        from flask import jsonify
+        return jsonify({"error": "authentication required"}), 401
+    return redirect("/login" if scope == "manager" else "/employee/login")
+
+
+def manager_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not current_app.config.get("AUTH_ENABLED"):
+            return f(*args, **kwargs)
+        if session.get("role") != "manager":
+            return _deny("manager")
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def employee_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not current_app.config.get("AUTH_ENABLED"):
+            return f(*args, **kwargs)
+        if session.get("user_id") is None:
+            return _deny("employee")
+        return f(*args, **kwargs)
+    return wrapper
