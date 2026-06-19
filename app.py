@@ -13,13 +13,18 @@ from functools import wraps
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, jsonify, request, send_file, render_template, g
+from flask import Flask, jsonify, request, send_file, render_template, g, session, redirect
 import sqlite3
 
 from fpdf import FPDF
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+from auth import (
+    manager_required, employee_required,
+    login_user, logout_user, verify_login,
+)
 
 # =============================================================================
 # CONFIGURATION
@@ -688,7 +693,41 @@ def register_routes(app):
             'employee_portal.html',
             static_v=_static_version('js/employee_portal.js', 'css/employee_portal.css'),
         )
-    
+
+    @app.route('/login', methods=['GET', 'POST'])
+    def login():
+        if request.method == 'POST':
+            username = (request.form.get('username') or '').strip()
+            password = request.form.get('password') or ''
+            emp_id, reason = verify_login(get_db(), username, password, 'manager')
+            if emp_id:
+                login_user(emp_id, 'manager', permanent=False)
+                return redirect('/')
+            msg = ('Account temporarily locked. Try again later.'
+                   if reason == 'locked' else 'Invalid credentials.')
+            return render_template('login.html', error=msg), 401
+        return render_template('login.html', error=None)
+
+    @app.route('/employee/login', methods=['GET', 'POST'])
+    def employee_login():
+        if request.method == 'POST':
+            identifier = (request.form.get('name') or '').strip()
+            pin = request.form.get('pin') or ''
+            emp_id, reason = verify_login(get_db(), identifier, pin, 'employee')
+            if emp_id:
+                login_user(emp_id, 'employee', permanent=True)
+                return redirect('/employee')
+            msg = ('Account temporarily locked. Try again later.'
+                   if reason == 'locked' else 'Invalid name or PIN.')
+            return render_template('employee_login.html', error=msg), 401
+        return render_template('employee_login.html', error=None)
+
+    @app.route('/logout', methods=['GET', 'POST'])
+    def logout():
+        was_manager = session.get('role') == 'manager'
+        logout_user()
+        return redirect('/login' if was_manager else '/employee/login')
+
     # -------------------------------------------------------------------------
     # Schedule API
     # -------------------------------------------------------------------------

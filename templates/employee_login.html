@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Employee Login — Ice Line Scheduler</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f4f5f7; display: flex;
+           min-height: 100vh; align-items: center; justify-content: center; margin: 0; }
+    .card { background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,.1);
+            width: 320px; }
+    h1 { font-size: 1.1rem; margin: 0 0 1rem; }
+    label { display: block; font-size: .85rem; margin: .75rem 0 .25rem; }
+    input { width: 100%; padding: .55rem; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+    button { width: 100%; margin-top: 1.25rem; padding: .6rem; border: 0; border-radius: 6px;
+             background: #19be6b; color: #fff; font-size: 1rem; cursor: pointer; }
+    .error { color: #c0392b; font-size: .85rem; margin-top: .75rem; }
+  </style>
+</head>
+<body>
+  <form class="card" method="POST" action="/employee/login">
+    <h1>Ice Line Schedule — Employee Login</h1>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <label for="name">Your name</label>
+    <input id="name" name="name" autocomplete="username" autofocus required>
+    <label for="pin">4-digit PIN</label>
+    <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*"
+           maxlength="4" autocomplete="current-password" required>
+    <button type="submit">Log in</button>
+  </form>
+</body>
+</html>
