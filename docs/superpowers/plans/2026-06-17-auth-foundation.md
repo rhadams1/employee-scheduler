@@ -854,14 +854,19 @@ async function setEmployeePin(empId, name) {
 }
 ```
 
-In the employee-row action markup (where `employee-actions` buttons are rendered in `renderToolbar`/row rendering — find the existing per-employee action buttons), add a button:
+In `renderSingleEmployeeRow` (static/js/main.js, ~line 1743) there is a
+`<div class="employee-actions">` block of `emp-action-btn` buttons (📋 copy, ✎ edit, ✕ hide).
+The row variable is `emp` (with `emp.id`, `emp.name`). Add the 🔑 button as the LAST element
+inside that `employee-actions` div, so the block becomes:
 
 ```javascript
-                <button class="employee-action" title="Set login PIN"
-                        onclick="setEmployeePin(${employee.id}, '${employee.name.replace(/'/g, "\\'")}')">🔑</button>
+            <div class="employee-actions">
+                <button class="emp-action-btn copy" onclick="copyEmployeePreviousWeek('${section}', ${empIndex})" title="Copy this employee's previous week">📋</button>
+                <button class="emp-action-btn edit" onclick="openEmployeeModal('${section}', ${empIndex})" title="Edit">✎</button>
+                ${showHideBtn ? `<button class="emp-action-btn delete" onclick="hideEmployee(${empIndex})" title="Hide from new schedules">✕</button>` : ''}
+                <button class="emp-action-btn" onclick="setEmployeePin(${emp.id}, '${emp.name.replace(/'/g, "\\'")}')" title="Set login PIN">🔑</button>
+            </div>
 ```
-
-(Match the surrounding markup/quoting style; place it alongside the existing per-employee action buttons.)
 
 - [ ] **Step 3: Verify the endpoint**
 
