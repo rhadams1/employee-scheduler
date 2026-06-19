@@ -1037,7 +1037,28 @@ def register_routes(app):
         except Exception as e:
             logging.error(f"Error restoring employee: {e}")
             return jsonify({'error': str(e)}), 400
-    
+
+    @app.route('/api/employees/<int:emp_id>/credentials', methods=['POST'])
+    @manager_required
+    def set_employee_credentials(emp_id):
+        """Manager sets/resets an employee's login username and/or 4-digit PIN."""
+        data = request.get_json(silent=True) or {}
+        username = (data.get('username') or '').strip().lower() or None
+        pin = data.get('pin')
+        conn = get_db()
+        try:
+            if username:
+                conn.execute("UPDATE employees SET username = ? WHERE id = ?", (username, emp_id))
+            if pin:
+                from auth import set_pin
+                set_pin(conn, emp_id, str(pin))
+            conn.commit()
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
+        except sqlite3.IntegrityError:
+            return jsonify({'error': 'That username is already taken'}), 409
+        return jsonify({'success': True})
+
     # -------------------------------------------------------------------------
     # Employee Notes API
     # -------------------------------------------------------------------------

@@ -739,6 +739,28 @@ function exportTimeOffCalendars() {
     window.location.href = `${Config.API_BASE}/api/timeoff-calendars`;
 }
 
+async function setEmployeePin(empId, name) {
+    const username = prompt(`Login username for ${name} (lowercase, no spaces). Leave blank to keep current:`);
+    if (username === null) return;  // cancelled
+    const pin = prompt(`New 4-digit PIN for ${name} (leave blank to keep current):`);
+    if (pin === null) return;
+    const body = {};
+    if (username.trim()) body.username = username.trim();
+    if (pin.trim()) body.pin = pin.trim();
+    if (!Object.keys(body).length) return;
+    const res = await fetch(`${Config.API_BASE}/api/employees/${empId}/credentials`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (res.ok) {
+        alert(`Login updated for ${name}.`);
+    } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Could not update login: ${err.error || res.status}`);
+    }
+}
+
 // =============================================================================
 // EVENT LISTENERS
 // =============================================================================
@@ -1744,6 +1766,7 @@ function renderSingleEmployeeRow(emp, section, empIndex) {
                 <button class="emp-action-btn copy" onclick="copyEmployeePreviousWeek('${section}', ${empIndex})" title="Copy this employee's previous week">📋</button>
                 <button class="emp-action-btn edit" onclick="openEmployeeModal('${section}', ${empIndex})" title="Edit">✎</button>
                 ${showHideBtn ? `<button class="emp-action-btn delete" onclick="hideEmployee(${empIndex})" title="Hide from new schedules">✕</button>` : ''}
+                <button class="emp-action-btn" onclick="setEmployeePin(${emp.id}, '${emp.name.replace(/'/g, "\\'")}')" title="Set login PIN">🔑</button>
             </div>
         </td>
     `;
