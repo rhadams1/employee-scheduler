@@ -143,22 +143,28 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 
 def set_password(conn, emp_id, password):
-    """Set a manager password and promote the row to role='manager'."""
+    """Set a manager password and promote the row to role='manager'.
+
+    Also clears any lockout state — an admin setting/resetting a credential
+    unlocks the account (the spec's "reset a locked account" behavior).
+    """
     if not password:
         raise ValueError("password must not be empty")
     conn.execute(
-        "UPDATE employees SET password_hash = ?, role = 'manager' WHERE id = ?",
+        "UPDATE employees SET password_hash = ?, role = 'manager', "
+        "failed_attempts = 0, locked_until = NULL WHERE id = ?",
         (generate_password_hash(password), emp_id),
     )
     conn.commit()
 
 
 def set_pin(conn, emp_id, pin):
-    """Set a 4-digit employee PIN (hashed)."""
+    """Set a 4-digit employee PIN (hashed). Also clears any lockout state."""
     if not (isinstance(pin, str) and pin.isdigit() and len(pin) == 4):
         raise ValueError("PIN must be exactly 4 digits")
     conn.execute(
-        "UPDATE employees SET pin_hash = ? WHERE id = ?",
+        "UPDATE employees SET pin_hash = ?, failed_attempts = 0, "
+        "locked_until = NULL WHERE id = ?",
         (generate_password_hash(pin), emp_id),
     )
     conn.commit()
