@@ -739,7 +739,17 @@ function exportTimeOffCalendars() {
     window.location.href = `${Config.API_BASE}/api/timeoff-calendars`;
 }
 
-async function setEmployeePin(empId, name) {
+async function setEmployeePin(section, empIndex) {
+    let emp;
+    if (section === 'manager') {
+        emp = scheduleData.managers[empIndex];
+    } else if (section === 'zak') {
+        emp = scheduleData.zakReilly;
+    } else {
+        emp = scheduleData.employees[empIndex];
+    }
+    if (!emp) return;
+    const name = emp.name;
     const username = prompt(`Login username for ${name} (lowercase, no spaces). Leave blank to keep current:`);
     if (username === null) return;  // cancelled
     const pin = prompt(`New 4-digit PIN for ${name} (leave blank to keep current):`);
@@ -748,7 +758,7 @@ async function setEmployeePin(empId, name) {
     if (username.trim()) body.username = username.trim();
     if (pin.trim()) body.pin = pin.trim();
     if (!Object.keys(body).length) return;
-    const res = await fetch(`${Config.API_BASE}/api/employees/${empId}/credentials`, {
+    const res = await fetch(`${Config.API_BASE}/api/employees/${emp.id}/credentials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -1766,7 +1776,7 @@ function renderSingleEmployeeRow(emp, section, empIndex) {
                 <button class="emp-action-btn copy" onclick="copyEmployeePreviousWeek('${section}', ${empIndex})" title="Copy this employee's previous week">📋</button>
                 <button class="emp-action-btn edit" onclick="openEmployeeModal('${section}', ${empIndex})" title="Edit">✎</button>
                 ${showHideBtn ? `<button class="emp-action-btn delete" onclick="hideEmployee(${empIndex})" title="Hide from new schedules">✕</button>` : ''}
-                <button class="emp-action-btn" onclick="setEmployeePin(${emp.id}, '${emp.name.replace(/'/g, "\\'")}')" title="Set login PIN">🔑</button>
+                <button class="emp-action-btn" onclick="setEmployeePin('${section}', ${empIndex})" title="Set login PIN">🔑</button>
             </div>
         </td>
     `;
