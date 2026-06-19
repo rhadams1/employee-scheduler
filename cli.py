@@ -32,37 +32,41 @@ def register_cli(app):
     @click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
     def set_manager_password(identifier, password):
         conn = _connect()
-        rows = _find_employee(conn, identifier)
-        if len(rows) != 1:
-            click.echo(f"Expected exactly one match for '{identifier}', found {len(rows)}.")
-            return
-        emp = rows[0]
-        if not emp["username"]:
-            conn.execute("UPDATE employees SET username = ? WHERE id = ?",
-                         (identifier.strip().lower(), emp["id"]))
-            conn.commit()
-        auth.set_password(conn, emp["id"], password)
-        click.echo(f"Manager password set for {emp['name']} (role=manager).")
-        conn.close()
+        try:
+            rows = _find_employee(conn, identifier)
+            if len(rows) != 1:
+                click.echo(f"Expected exactly one match for '{identifier}', found {len(rows)}.")
+                return
+            emp = rows[0]
+            if not emp["username"]:
+                conn.execute("UPDATE employees SET username = ? WHERE id = ?",
+                             (identifier.strip().lower(), emp["id"]))
+                conn.commit()
+            auth.set_password(conn, emp["id"], password)
+            click.echo(f"Manager password set for {emp['name']} (role=manager).")
+        finally:
+            conn.close()
 
     @app.cli.command("set-employee-pin")
     @click.argument("identifier")
     @click.option("--pin", prompt=True, hide_input=True)
     def set_employee_pin(identifier, pin):
         conn = _connect()
-        rows = _find_employee(conn, identifier)
-        if len(rows) != 1:
-            click.echo(f"Expected exactly one match for '{identifier}', found {len(rows)}.")
-            return
-        emp = rows[0]
-        if not emp["username"]:
-            conn.execute("UPDATE employees SET username = ? WHERE id = ?",
-                         (identifier.strip().lower(), emp["id"]))
-            conn.commit()
         try:
-            auth.set_pin(conn, emp["id"], pin)
-        except ValueError as e:
-            click.echo(f"Error: {e}")
-            return
-        click.echo(f"PIN set for {emp['name']}.")
-        conn.close()
+            rows = _find_employee(conn, identifier)
+            if len(rows) != 1:
+                click.echo(f"Expected exactly one match for '{identifier}', found {len(rows)}.")
+                return
+            emp = rows[0]
+            if not emp["username"]:
+                conn.execute("UPDATE employees SET username = ? WHERE id = ?",
+                             (identifier.strip().lower(), emp["id"]))
+                conn.commit()
+            try:
+                auth.set_pin(conn, emp["id"], pin)
+            except ValueError as e:
+                click.echo(f"Error: {e}")
+                return
+            click.echo(f"PIN set for {emp['name']}.")
+        finally:
+            conn.close()
