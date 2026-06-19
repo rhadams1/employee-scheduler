@@ -33,6 +33,15 @@ class Config:
     BACKUP_IMPORT_ENABLED = os.environ.get('BACKUP_IMPORT_ENABLED', 'false').lower() == 'true'
     PDF_RENDER_BASE_URL = os.environ.get('PDF_RENDER_BASE_URL', 'http://127.0.0.1:5001')
     PDF_RENDER_TIMEOUT_MS = int(os.environ.get('PDF_RENDER_TIMEOUT_MS', '10000'))
+    AUTH_ENABLED = os.environ.get('AUTH_ENABLED', 'false').lower() == 'true'
+    # Session cookie hardening. HTTPS comes from the Cloudflare tunnel in prod;
+    # SESSION_COOKIE_SECURE stays off for LAN/dev unless explicitly enabled.
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true'
+    PERMANENT_SESSION_LIFETIME = timedelta(days=30)  # employee "remember this device"
+    AUTH_MAX_FAILED = int(os.environ.get('AUTH_MAX_FAILED', '5'))
+    AUTH_LOCKOUT_MINUTES = int(os.environ.get('AUTH_LOCKOUT_MINUTES', '15'))
 
     # Schedule configuration
     WEEK_START_DAY = 'wednesday'  # Schedule week starts on Wednesday
@@ -191,6 +200,27 @@ def init_db():
     if 'version' not in schedule_cols:
         cursor.execute("ALTER TABLE schedules ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
         logging.info("Migrated: added schedules.version column")
+
+    # Auth columns (Phase 1 auth foundation) — additive, safe to re-run on existing DBs
+    cursor.execute("PRAGMA table_info(employees)")
+    employee_cols = {row[1] for row in cursor.fetchall()}
+    if 'role' not in employee_cols:
+        cursor.execute("ALTER TABLE employees ADD COLUMN role TEXT NOT NULL DEFAULT 'employee'")
+        logging.info("Migrated: added employees.role column")
+    if 'username' not in employee_cols:
+        cursor.execute("ALTER TABLE employees ADD COLUMN username TEXT")
+    if 'password_hash' not in employee_cols:
+        cursor.execute("ALTER TABLE employees ADD COLUMN password_hash TEXT")
+    if 'pin_hash' not in employee_cols:
+        cursor.execute("ALTER TABLE employees ADD COLUMN pin_hash TEXT")
+    if 'failed_attempts' not in employee_cols:
+        cursor.execute("ALTER TABLE employees ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0")
+    if 'locked_until' not in employee_cols:
+        cursor.execute("ALTER TABLE employees ADD COLUMN locked_until TIMESTAMP")
+    cursor.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_employees_username "
+        "ON employees(username) WHERE username IS NOT NULL"
+    )
 
     # Seed default employees if table is empty
     cursor.execute('SELECT COUNT(*) FROM employees')
