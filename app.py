@@ -678,6 +678,7 @@ def register_routes(app):
         return str(latest)
 
     @app.route('/')
+    @manager_required
     def index():
         return render_template(
             'index.html',
@@ -687,6 +688,7 @@ def register_routes(app):
 
     @app.route('/employee')
     @app.route('/employee/')
+    @employee_required
     def employee_portal():
         """Employee portal - read-only schedule view"""
         return render_template(
@@ -733,6 +735,7 @@ def register_routes(app):
     # -------------------------------------------------------------------------
     
     @app.route('/api/current-week', methods=['GET'])
+    @employee_required
     def get_current_week():
         """Get the current schedule week start date"""
         today = date.today()
@@ -743,6 +746,7 @@ def register_routes(app):
         })
     
     @app.route('/api/schedule/<week_start>', methods=['GET'])
+    @employee_required
     def get_schedule(week_start):
         """Get schedule for a specific week"""
         try:
@@ -752,6 +756,7 @@ def register_routes(app):
             return jsonify({'error': str(e)}), 400
     
     @app.route('/api/schedule/<week_start>', methods=['POST'])
+    @manager_required
     def save_schedule(week_start):
         """Save/update schedule for a specific week with optimistic concurrency.
 
@@ -849,6 +854,7 @@ def register_routes(app):
             return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 400
     
     @app.route('/api/schedule/<week_start>/shift', methods=['POST'])
+    @manager_required
     def update_shift(week_start):
         """Update a single shift"""
         try:
@@ -887,6 +893,7 @@ def register_routes(app):
     # -------------------------------------------------------------------------
     
     @app.route('/api/employees', methods=['GET'])
+    @manager_required
     def get_employees():
         """Get all active employees"""
         db = get_db()
@@ -899,6 +906,7 @@ def register_routes(app):
         return jsonify([dict(row) for row in cursor.fetchall()])
     
     @app.route('/api/employees', methods=['POST'])
+    @manager_required
     def add_employee():
         """Add a new employee"""
         try:
@@ -939,6 +947,7 @@ def register_routes(app):
             return jsonify({'error': str(e)}), 400
     
     @app.route('/api/employees/<int:emp_id>', methods=['PUT'])
+    @manager_required
     def update_employee(emp_id):
         """Update an employee"""
         try:
@@ -977,6 +986,7 @@ def register_routes(app):
             return jsonify({'error': str(e)}), 400
     
     @app.route('/api/employees/<int:emp_id>', methods=['DELETE'])
+    @manager_required
     def delete_employee(emp_id):
         """Hide an employee from new schedules. Past weeks where they had shifts
         still show them; the Hidden Employees panel can bring them back."""
@@ -995,6 +1005,7 @@ def register_routes(app):
             return jsonify({'error': str(e)}), 400
 
     @app.route('/api/employees/<int:emp_id>/restore', methods=['POST'])
+    @manager_required
     def restore_employee(emp_id):
         """Bring a hidden employee back into active scheduling."""
         try:
@@ -1020,6 +1031,7 @@ def register_routes(app):
     # -------------------------------------------------------------------------
     
     @app.route('/api/notes/<week_start>/<int:emp_id>', methods=['GET'])
+    @manager_required
     def get_note(week_start, emp_id):
         """Get note for employee for a specific week"""
         db = get_db()
@@ -1032,6 +1044,7 @@ def register_routes(app):
         return jsonify({'note': row['note'] if row else ''})
     
     @app.route('/api/notes/<week_start>/<int:emp_id>', methods=['POST'])
+    @manager_required
     def save_note(week_start, emp_id):
         """Save note for employee for a specific week"""
         try:
@@ -1067,6 +1080,7 @@ def register_routes(app):
     # -------------------------------------------------------------------------
     
     @app.route('/api/schedule/<week_start>/export', methods=['GET'])
+    @manager_required
     def export_schedule(week_start):
         """Export schedule to Excel with formatting"""
         try:
@@ -1218,6 +1232,7 @@ def register_routes(app):
     # -------------------------------------------------------------------------
 
     @app.route('/api/schedule/<week_start>/export-pdf', methods=['GET'])
+    @manager_required
     def export_schedule_pdf(week_start):
         """Export schedule to PDF. Prefers headless Chromium (pixel-matches the
         on-screen print view); falls back to the FPDF generator if Chromium is
@@ -1255,6 +1270,7 @@ def register_routes(app):
             return jsonify({'error': str(e)}), 400
 
     @app.route('/api/timeoff-calendars', methods=['GET'])
+    @manager_required
     def export_timeoff_calendars():
         """Generate blank printable monthly calendars for staff time-off requests.
 
@@ -1413,6 +1429,7 @@ def register_routes(app):
     # -------------------------------------------------------------------------
 
     @app.route('/api/backup/export', methods=['GET'])
+    @manager_required
     def export_database():
         """Export entire database to JSON for backup"""
         try:
@@ -1480,6 +1497,7 @@ def register_routes(app):
             return jsonify({'error': str(e)}), 400
     
     @app.route('/api/backup/import', methods=['POST'])
+    @manager_required
     def import_database():
         """Import database from JSON backup. Disabled by default — this
         endpoint replaces the entire DB and there is no auth on the app yet.
