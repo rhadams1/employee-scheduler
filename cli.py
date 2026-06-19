@@ -9,10 +9,14 @@ import sqlite3
 import click
 
 import auth
-from app import Config
 
 
 def _connect():
+    # Import Config lazily (not at module top) to avoid a circular import:
+    # app.py runs `app = create_app()` at module load, create_app imports this
+    # module, and a top-level `from app import Config` would re-enter app.py
+    # before it finished — which breaks `python app.py` (run as __main__).
+    from app import Config
     conn = sqlite3.connect(Config.DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
