@@ -1532,10 +1532,9 @@ def register_routes(app):
     @app.route('/api/backup/import', methods=['POST'])
     @manager_required
     def import_database():
-        """Import database from JSON backup. Disabled by default — this
-        endpoint replaces the entire DB and there is no auth on the app yet.
-        Set BACKUP_IMPORT_ENABLED=true in the LXC env to re-enable temporarily
-        when running a restore, then unset it."""
+        """Import database from JSON backup. Manager-only and disabled by default —
+        this endpoint replaces the entire DB. Set BACKUP_IMPORT_ENABLED=true in the
+        LXC env to re-enable temporarily when running a restore, then unset it."""
         if not Config.BACKUP_IMPORT_ENABLED:
             return jsonify({
                 'error': 'Backup import is disabled',

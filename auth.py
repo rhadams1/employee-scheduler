@@ -1,8 +1,8 @@
 """Authentication helpers for the Ice Line scheduler.
 
 Pure of any import from app.py (avoids circular imports). DB-touching functions
-take an explicit sqlite3 connection (row_factory=sqlite3.Row); decorators/session
-helpers (added in a later task) use only flask.session.
+take an explicit sqlite3 connection (row_factory=sqlite3.Row); the decorators and
+session helpers use only flask.session.
 """
 from datetime import datetime, timedelta
 from functools import wraps
