@@ -83,7 +83,11 @@ def create_app(config_class=Config):
     
     # Register blueprints/routes
     register_routes(app)
-    
+
+    # Register CLI commands (bootstrap credentials)
+    from cli import register_cli
+    register_cli(app)
+
     # Register error handlers
     register_error_handlers(app)
     
