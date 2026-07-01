@@ -33,6 +33,14 @@ class Config:
     BACKUP_IMPORT_ENABLED = os.environ.get('BACKUP_IMPORT_ENABLED', 'false').lower() == 'true'
     PDF_RENDER_BASE_URL = os.environ.get('PDF_RENDER_BASE_URL', 'http://127.0.0.1:5001')
     PDF_RENDER_TIMEOUT_MS = int(os.environ.get('PDF_RENDER_TIMEOUT_MS', '10000'))
+    EMAIL_ENABLED = os.environ.get('EMAIL_ENABLED', 'false').lower() == 'true'
+    SMTP_HOST = os.environ.get('SMTP_HOST', 'securemail2.megamailservers.com')
+    SMTP_PORT = int(os.environ.get('SMTP_PORT', '465'))
+    SMTP_USER = os.environ.get('SMTP_USER', 'badams@iceline.info')
+    SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')  # ONLY from .env
+    EMAIL_FROM = os.environ.get('EMAIL_FROM', 'badams@iceline.info')
+    EMAIL_FROM_NAME = os.environ.get('EMAIL_FROM_NAME', 'Ice Line Schedule')
+    EMAIL_TEST_RECIPIENT = os.environ.get('EMAIL_TEST_RECIPIENT', 'badams@iceline.info')
 
     # Schedule configuration
     WEEK_START_DAY = 'wednesday'  # Schedule week starts on Wednesday
@@ -191,6 +199,43 @@ def init_db():
     if 'version' not in schedule_cols:
         cursor.execute("ALTER TABLE schedules ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
         logging.info("Migrated: added schedules.version column")
+
+    # Notification foundation (weekly bulletin) — additive, idempotent
+    cursor.execute("PRAGMA table_info(employees)")
+    employee_cols = {row[1] for row in cursor.fetchall()}
+    if 'email' not in employee_cols:
+        cursor.execute("ALTER TABLE employees ADD COLUMN email TEXT")
+        logging.info("Migrated: added employees.email column")
+
+    cursor.executescript('''
+        CREATE TABLE IF NOT EXISTS publications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            week_start DATE NOT NULL,
+            message_type TEXT NOT NULL DEFAULT 'bulletin',
+            snapshot_json TEXT NOT NULL,
+            recipient_count INTEGER NOT NULL DEFAULT 0,
+            sent_count INTEGER NOT NULL DEFAULT 0,
+            failed_count INTEGER NOT NULL DEFAULT 0,
+            is_test INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS email_outbox (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            publication_id INTEGER,
+            message_type TEXT NOT NULL,
+            employee_id INTEGER,
+            recipient_email TEXT NOT NULL,
+            recipient_name TEXT,
+            subject TEXT,
+            status TEXT NOT NULL,
+            error TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (publication_id) REFERENCES publications(id) ON DELETE SET NULL,
+            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_outbox_publication ON email_outbox(publication_id);
+    ''')
 
     # Seed default employees if table is empty
     cursor.execute('SELECT COUNT(*) FROM employees')
