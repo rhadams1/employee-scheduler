@@ -1258,7 +1258,7 @@ def register_routes(app):
                     'shifts': shifts_by_id.get(r['id'], [None] * 7),
                 })
             else:
-                missing.append(r['name'])
+                missing.append({'id': r['id'], 'name': r['name']})
         return recipients, missing
 
     @app.route('/api/schedule/<week_start>/bulletin/preview', methods=['GET'])
@@ -1271,7 +1271,7 @@ def register_routes(app):
             return jsonify({
                 'enabled': Config.EMAIL_ENABLED,
                 'recipients': [{'id': r['id'], 'name': r['name'], 'email': r['email']} for r in recipients],
-                'missing_email': missing,
+                'missing_email': [m['name'] for m in missing],
                 'sample_html': sample_html,
             })
         except Exception as e:
@@ -1299,6 +1299,7 @@ def register_routes(app):
                 (week_start, _json.dumps(data), 1 if is_test else 0),
             )
             pub_id = cur.lastrowid
+            db.commit()
 
             def _log(emp_id, email, name, subject, status, error=None):
                 db.execute(
@@ -1307,37 +1308,46 @@ def register_routes(app):
                     "VALUES (?, 'bulletin', ?, ?, ?, ?, ?, ?)",
                     (pub_id, emp_id, email, name, subject, status, error),
                 )
+                db.commit()
 
             sent = failed = skipped = 0
 
             if is_test:
                 sample = recipients[0] if recipients else {'name': 'Test', 'shifts': [None] * 7}
                 subject, html, text = render_bulletin(sample, data)
+                status, err = 'sent', None
                 try:
                     send_email(smtp, Config.EMAIL_TEST_RECIPIENT, subject, html, text)
-                    _log(None, Config.EMAIL_TEST_RECIPIENT, 'TEST', subject, 'sent')
                     sent = 1
                 except Exception as e:
-                    _log(None, Config.EMAIL_TEST_RECIPIENT, 'TEST', subject, 'failed', str(e))
+                    status, err = 'failed', str(e)
                     failed = 1
+                try:
+                    _log(None, Config.EMAIL_TEST_RECIPIENT, 'TEST', subject, status, err)
+                except Exception as le:
+                    logging.error(f"outbox log failed for TEST: {le}")
             else:
-                for name in missing:
-                    _log(None, '', name, None, 'skipped')
+                for m in missing:
+                    _log(m['id'], '', m['name'], None, 'skipped')
                     skipped += 1
                 for r in recipients:
                     subject, html, text = render_bulletin(r, data)
+                    status, err = 'sent', None
                     try:
                         send_email(smtp, r['email'], subject, html, text)
-                        _log(r['id'], r['email'], r['name'], subject, 'sent')
                         sent += 1
                     except Exception as e:
-                        _log(r['id'], r['email'], r['name'], subject, 'failed', str(e))
+                        status, err = 'failed', str(e)
                         failed += 1
+                    try:
+                        _log(r['id'], r['email'], r['name'], subject, status, err)
+                    except Exception as le:
+                        logging.error(f"outbox log failed for {r['email']}: {le}")
 
             db.execute(
                 "UPDATE publications SET recipient_count = ?, sent_count = ?, failed_count = ? "
                 "WHERE id = ?",
-                (len(recipients), sent, failed, pub_id),
+                ((1 if is_test else len(recipients)), sent, failed, pub_id),
             )
             db.commit()
             return jsonify({'publication_id': pub_id, 'sent': sent, 'failed': failed, 'skipped': skipped})
