@@ -1328,8 +1328,11 @@ def register_routes(app):
                     logging.error(f"outbox log failed for TEST: {le}")
             else:
                 for m in missing:
-                    _log(m['id'], '', m['name'], None, 'skipped')
-                    skipped += 1
+                    try:
+                        _log(m['id'], '', m['name'], None, 'skipped')
+                        skipped += 1
+                    except Exception as le:
+                        logging.error(f"outbox log failed for skipped {m['name']}: {le}")
                 for r in recipients:
                     subject, html, text = render_bulletin(r, data)
                     status, err = 'sent', None
