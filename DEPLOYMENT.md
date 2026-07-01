@@ -166,6 +166,25 @@ chmod 600 /home/scheduler/employee-scheduler/.env
 
 **⚠️ Important:** Generate a strong SECRET_KEY for production!
 
+### Weekly bulletin email (SMTP)
+
+The "Email Schedule" button and the (future) reminder cron send via SMTP over the
+Ice Line mail host. Add to the LXC `.env`:
+
+    EMAIL_ENABLED=false                 # flip to true only after a successful test-send
+    SMTP_HOST=securemail2.megamailservers.com
+    SMTP_PORT=465                       # implicit SSL
+    SMTP_USER=badams@iceline.info
+    SMTP_PASSWORD=<the mailbox password>
+    EMAIL_FROM=badams@iceline.info
+    EMAIL_FROM_NAME=Ice Line Schedule
+    EMAIL_TEST_RECIPIENT=badams@iceline.info
+
+Rollout: deploy with `EMAIL_ENABLED=false`, then set it `true`, restart, open a week,
+click **Email Schedule → Send test to me**, confirm the email arrives, then use
+**Send to all staff**. If Chromium/PDF or anything else is mid-deploy, this is
+independent. No new Python dependency (uses stdlib `smtplib`).
+
 ## Step 4: Configure Systemd Service
 
 Create systemd service file:
