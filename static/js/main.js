@@ -1102,6 +1102,10 @@ function openAddEmployeeModal() {
                         <label>Phone</label>
                         <input type="text" id="empPhone" placeholder="(XXX) XXX-XXXX">
                     </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="empEmail" placeholder="name@example.com">
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
@@ -1119,6 +1123,7 @@ function openAddEmployeeModal() {
 async function saveNewEmployee() {
     const name = document.getElementById('empName').value.trim();
     const phone = document.getElementById('empPhone').value.trim();
+    const email = document.getElementById('empEmail').value.trim();
     
     if (!name) {
         alert('Please enter a name');
@@ -1129,7 +1134,7 @@ async function saveNewEmployee() {
         const response = await fetch(`${Config.API_BASE}/api/employees`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, phone, section: 'staff' })
+            body: JSON.stringify({ name, phone, email, section: 'staff' })
         });
         
         if (!response.ok) throw new Error('Failed to add employee');
@@ -1140,6 +1145,7 @@ async function saveNewEmployee() {
             id: newEmp.id,
             name: newEmp.name,
             phone: newEmp.phone || '',
+            email: newEmp.email || '',
             shifts: [null, null, null, null, null, null, null],
             note: ''
         });
@@ -1179,6 +1185,10 @@ function openEmployeeModal(section, empIndex) {
                         <label>Phone</label>
                         <input type="text" id="empPhone" value="${employee.phone || ''}">
                     </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="empEmail" value="${employee.email || ''}">
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
@@ -1204,6 +1214,7 @@ async function saveEmployee(section, empIndex) {
     
     const name = document.getElementById('empName').value.trim();
     const phone = document.getElementById('empPhone').value.trim();
+    const email = document.getElementById('empEmail').value.trim();
     
     if (!name) {
         alert('Please enter a name');
@@ -1214,11 +1225,12 @@ async function saveEmployee(section, empIndex) {
         await fetch(`${Config.API_BASE}/api/employees/${employee.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, phone })
+            body: JSON.stringify({ name, phone, email })
         });
         
         employee.name = name;
         employee.phone = phone;
+        employee.email = email;
         
         closeModal();
         renderSchedule();

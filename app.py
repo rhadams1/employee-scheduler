@@ -414,6 +414,7 @@ def build_schedule_response(week_start_str):
             'id': emp['id'],
             'name': emp['name'],
             'phone': emp['phone'] or '',
+            'email': emp['email'] or '',
             'active': bool(emp['active']),
             'shifts': [shifts.get((emp['id'], i)) for i in range(7)],
             'note': notes.get(emp['id'], '')
@@ -894,9 +895,9 @@ def register_routes(app):
             next_order = cursor.fetchone()[0]
             
             cursor.execute(
-                '''INSERT INTO employees (name, phone, section, sort_order) 
-                   VALUES (?, ?, ?, ?)''',
-                (data['name'], data.get('phone', ''), section, next_order)
+                '''INSERT INTO employees (name, phone, email, section, sort_order)
+                   VALUES (?, ?, ?, ?, ?)''',
+                (data['name'], data.get('phone', ''), data.get('email', ''), section, next_order)
             )
             
             emp_id = cursor.lastrowid
@@ -922,7 +923,7 @@ def register_routes(app):
             updates = []
             values = []
             
-            for field in ['name', 'phone', 'sort_order']:
+            for field in ['name', 'phone', 'email', 'sort_order']:
                 if field in data:
                     updates.append(f'{field} = ?')
                     values.append(data[field])
