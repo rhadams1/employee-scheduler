@@ -21,6 +21,10 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
+import json as _json
+from emailer import send_email
+from bulletin import render_bulletin
+
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
@@ -1225,6 +1229,120 @@ def register_routes(app):
             )
         except Exception as e:
             logging.error(f"Error exporting PDF: {e}")
+            return jsonify({'error': str(e)}), 400
+
+    def _bulletin_recipients(data):
+        """Return (recipients, missing) from a schedule_data snapshot.
+        recipients: [{'id','name','email','shifts'}] for active employees WITH an email.
+        missing: [names] of active employees WITHOUT an email.
+        Shift data comes from the snapshot's people; recipients/missing come from the DB
+        (active employees), so people not on this week still get the bulletin.
+        """
+        people = list(data.get('managers', []))
+        if data.get('zakReilly'):
+            people.append(data['zakReilly'])
+        people.extend(data.get('employees', []))
+        shifts_by_id = {p['id']: p['shifts'] for p in people}
+
+        db = get_db()
+        rows = db.execute(
+            "SELECT id, name, email FROM employees WHERE active = 1 ORDER BY "
+            "CASE section WHEN 'manager' THEN 1 WHEN 'zak' THEN 2 ELSE 3 END, sort_order"
+        ).fetchall()
+        recipients, missing = [], []
+        for r in rows:
+            email = (r['email'] or '').strip()
+            if email:
+                recipients.append({
+                    'id': r['id'], 'name': r['name'], 'email': email,
+                    'shifts': shifts_by_id.get(r['id'], [None] * 7),
+                })
+            else:
+                missing.append(r['name'])
+        return recipients, missing
+
+    @app.route('/api/schedule/<week_start>/bulletin/preview', methods=['GET'])
+    def bulletin_preview(week_start):
+        try:
+            data = build_schedule_response(week_start)
+            recipients, missing = _bulletin_recipients(data)
+            sample_for = recipients[0] if recipients else {'name': 'Preview', 'shifts': [None] * 7}
+            _, sample_html, _ = render_bulletin(sample_for, data)
+            return jsonify({
+                'enabled': Config.EMAIL_ENABLED,
+                'recipients': [{'id': r['id'], 'name': r['name'], 'email': r['email']} for r in recipients],
+                'missing_email': missing,
+                'sample_html': sample_html,
+            })
+        except Exception as e:
+            logging.error(f"Error building bulletin preview: {e}")
+            return jsonify({'error': str(e)}), 400
+
+    @app.route('/api/schedule/<week_start>/bulletin/send', methods=['POST'])
+    def bulletin_send(week_start):
+        if not Config.EMAIL_ENABLED:
+            return jsonify({'error': 'Email sending is disabled'}), 403
+        try:
+            body = request.get_json(silent=True) or {}
+            is_test = bool(body.get('test'))
+            data = build_schedule_response(week_start)
+            recipients, missing = _bulletin_recipients(data)
+            smtp = {
+                'host': Config.SMTP_HOST, 'port': Config.SMTP_PORT,
+                'user': Config.SMTP_USER, 'password': Config.SMTP_PASSWORD,
+                'from_addr': Config.EMAIL_FROM, 'from_name': Config.EMAIL_FROM_NAME,
+            }
+            db = get_db()
+            cur = db.execute(
+                "INSERT INTO publications (week_start, message_type, snapshot_json, is_test) "
+                "VALUES (?, 'bulletin', ?, ?)",
+                (week_start, _json.dumps(data), 1 if is_test else 0),
+            )
+            pub_id = cur.lastrowid
+
+            def _log(emp_id, email, name, subject, status, error=None):
+                db.execute(
+                    "INSERT INTO email_outbox (publication_id, message_type, employee_id, "
+                    "recipient_email, recipient_name, subject, status, error) "
+                    "VALUES (?, 'bulletin', ?, ?, ?, ?, ?, ?)",
+                    (pub_id, emp_id, email, name, subject, status, error),
+                )
+
+            sent = failed = skipped = 0
+
+            if is_test:
+                sample = recipients[0] if recipients else {'name': 'Test', 'shifts': [None] * 7}
+                subject, html, text = render_bulletin(sample, data)
+                try:
+                    send_email(smtp, Config.EMAIL_TEST_RECIPIENT, subject, html, text)
+                    _log(None, Config.EMAIL_TEST_RECIPIENT, 'TEST', subject, 'sent')
+                    sent = 1
+                except Exception as e:
+                    _log(None, Config.EMAIL_TEST_RECIPIENT, 'TEST', subject, 'failed', str(e))
+                    failed = 1
+            else:
+                for name in missing:
+                    _log(None, '', name, None, 'skipped')
+                    skipped += 1
+                for r in recipients:
+                    subject, html, text = render_bulletin(r, data)
+                    try:
+                        send_email(smtp, r['email'], subject, html, text)
+                        _log(r['id'], r['email'], r['name'], subject, 'sent')
+                        sent += 1
+                    except Exception as e:
+                        _log(r['id'], r['email'], r['name'], subject, 'failed', str(e))
+                        failed += 1
+
+            db.execute(
+                "UPDATE publications SET recipient_count = ?, sent_count = ?, failed_count = ? "
+                "WHERE id = ?",
+                (len(recipients), sent, failed, pub_id),
+            )
+            db.commit()
+            return jsonify({'publication_id': pub_id, 'sent': sent, 'failed': failed, 'skipped': skipped})
+        except Exception as e:
+            logging.error(f"Error sending bulletin: {e}")
             return jsonify({'error': str(e)}), 400
 
     @app.route('/api/timeoff-calendars', methods=['GET'])
