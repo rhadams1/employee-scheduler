@@ -173,6 +173,11 @@ function getWeekStartFallback(date) {
     return monday.toISOString().split('T')[0];
 }
 
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => (
+        {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 // =============================================================================
 // API FUNCTIONS
 // =============================================================================
@@ -737,6 +742,69 @@ function exportToPDF() {
 function exportTimeOffCalendars() {
     // Blank monthly calendars (next 3 months) for staff to mark up by hand.
     window.location.href = `${Config.API_BASE}/api/timeoff-calendars`;
+}
+
+async function openBulletinModal() {
+    const week = State.currentWeekStart;
+    let data;
+    try {
+        const res = await fetch(`${Config.API_BASE}/api/schedule/${week}/bulletin/preview`);
+        if (!res.ok) throw new Error('preview failed');
+        data = await res.json();
+    } catch (e) {
+        alert('Could not build the email preview.');
+        return;
+    }
+    const missing = data.missing_email.length
+        ? `<div style="color:#c0392b;margin:8px 0">⚠ ${data.missing_email.length} without email (won't receive): ${data.missing_email.map(escapeHtml).join(', ')}</div>`
+        : '';
+    const disabledNote = data.enabled ? '' :
+        `<div style="color:#c0392b;margin:8px 0">Email sending is OFF (set EMAIL_ENABLED=true on the server). You can still send a test once enabled.</div>`;
+    const modalHtml = `
+        <div class="modal-overlay active" id="bulletinModal">
+            <div class="modal" style="max-width:640px">
+                <div class="modal-header">
+                    <h3>Email Schedule — Week of ${escapeHtml(scheduleData.weekTitle)}</h3>
+                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div>Recipients: <strong>${data.recipients.length}</strong> staff with email.</div>
+                    ${missing}
+                    ${disabledNote}
+                    <div style="border:1px solid #ddd;border-radius:6px;margin-top:10px;max-height:340px;overflow:auto">
+                        ${data.sample_html}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                    <button class="btn" onclick="sendBulletin(true)" ${data.enabled ? '' : 'disabled'}>Send test to me</button>
+                    <button class="btn btn-save" onclick="sendBulletin(false)" ${data.enabled ? '' : 'disabled'}>Send to all staff</button>
+                </div>
+            </div>
+        </div>
+    `;
+    closeModal();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function sendBulletin(test) {
+    if (!test && !confirm('Send this schedule email to ALL staff with an email on file?')) return;
+    const week = State.currentWeekStart;
+    try {
+        const res = await fetch(`${Config.API_BASE}/api/schedule/${week}/bulletin/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ test }),
+        });
+        const out = await res.json();
+        if (!res.ok) throw new Error(out.error || res.status);
+        closeModal();
+        alert(test
+            ? `Test email sent (${out.sent} sent, ${out.failed} failed).`
+            : `Sent to staff: ${out.sent} sent, ${out.failed} failed, ${out.skipped} skipped (no email).`);
+    } catch (e) {
+        alert(`Could not send: ${e.message}`);
+    }
 }
 
 // =============================================================================
@@ -1593,6 +1661,9 @@ function renderToolbar() {
                 </button>
                 <button class="action-btn" onclick="exportTimeOffCalendars()" title="Blank monthly calendars (next 3 months) for staff time-off requests">
                     <span class="icon">🗓️</span> Time-Off Sheets
+                </button>
+                <button class="action-btn" onclick="openBulletinModal()" title="Email this week's schedule to staff">
+                    <span class="icon">✉️</span> Email Schedule
                 </button>
                 <button class="action-btn" onclick="window.print()">
                     <span class="icon">🖨️</span> Print
