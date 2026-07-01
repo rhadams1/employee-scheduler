@@ -1021,7 +1021,7 @@ function updateShiftData(section, empIndex, dayIndex, shiftData) {
 // =============================================================================
 
 function closeModal() {
-    ['editModal', 'noteModal', 'employeeModal', 'officeHoursModal', 'eventsModal'].forEach(id => {
+    ['editModal', 'noteModal', 'employeeModal', 'officeHoursModal', 'eventsModal', 'bulletinModal'].forEach(id => {
         const modal = document.getElementById(id);
         if (modal) modal.remove();
     });
