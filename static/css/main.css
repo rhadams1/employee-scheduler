@@ -1153,6 +1153,45 @@ body.employee-view .view-indicator {
 }
 
 /* =============================================================================
+   CLOSED-DAY HIGHLIGHT — auto-applied to a day whose office hours = CLOSED
+   ============================================================================= */
+
+.schedule-table th.day-closed,
+.schedule-table td.day-closed {
+    background: #fadbdb !important;   /* light red across the closed day's column */
+}
+.schedule-table .day-header-row th.day-closed,
+.schedule-table .inout-header-row th.day-closed,
+.schedule-table .office-hours-row td.day-closed {
+    background: #f0a9a9 !important;   /* stronger red on the header + office-hours cell */
+    color: #7a1a1a;
+    font-weight: 700;
+}
+.schedule-table td.day-closed .shift-input {
+    background: transparent;
+    color: #9a2a2a;
+    cursor: not-allowed;
+    pointer-events: none;             /* locked: no editing shifts on a closed day */
+}
+
+@media print {
+    .schedule-table th.day-closed,
+    .schedule-table td.day-closed,
+    .schedule-table .day-header-row th.day-closed,
+    .schedule-table .inout-header-row th.day-closed,
+    .schedule-table .employee-row td.day-closed,
+    .schedule-table .employee-row.manager td.day-closed,
+    .schedule-table .employee-row.zak td.day-closed,
+    .schedule-table .office-hours-row td.day-closed,
+    .schedule-table .events-row td.day-closed {
+        background: #f0a9a9 !important;
+        color: #7a1a1a !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
+/* =============================================================================
    PRINT STYLES
    ============================================================================= */
 

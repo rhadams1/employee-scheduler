@@ -895,6 +895,7 @@ async function updateEmployeeOrder() {
 // =============================================================================
 
 function handleShiftInput(input, section, empIndex, dayIndex, type) {
+    if (isDayClosed(dayIndex)) return;  // no edits on a closed day
     saveStateForUndo();
 
     const value = parseTimeInput(input.value);
@@ -962,7 +963,8 @@ function closeModal() {
 
 function openShiftModal(section, empIndex, dayIndex) {
     if (State.currentView === 'employee') return;
-    
+    if (isDayClosed(dayIndex)) return;  // day closed: staff cells are locked
+
     let employee;
     if (section === 'manager') {
         employee = scheduleData.managers[empIndex];
@@ -1607,17 +1609,23 @@ function renderTitleRow() {
     `;
 }
 
+function isDayClosed(dayIndex) {
+    const oh = scheduleData.officeHours && scheduleData.officeHours[dayIndex];
+    return !!(oh && oh.in === 'CLOSED');
+}
+
 function renderDayHeaderRow() {
     let html = '<tr class="day-header-row"><th>Employee</th>';
-    
+
     scheduleData.days.forEach((day, dayIndex) => {
         const weekendClass = day.isWeekend ? 'weekend' : '';
+        const closedClass = isDayClosed(dayIndex) ? 'day-closed' : '';
         const holiday = getHolidayForDay(dayIndex);
         const holidayClass = holiday ? 'holiday' : '';
         const holidayHtml = holiday ? `<div class="holiday-indicator">🎉 ${holiday}</div>` : '';
-        
+
         html += `
-            <th colspan="2" class="${weekendClass} ${holidayClass}">
+            <th colspan="2" class="${weekendClass} ${holidayClass} ${closedClass}">
                 <div class="day-name">${day.name}</div>
                 <div class="day-date">${day.date}</div>
                 ${holidayHtml}
@@ -1632,9 +1640,10 @@ function renderDayHeaderRow() {
 function renderInOutHeaderRow() {
     let html = '<tr class="inout-header-row"><th></th>';
     
-    scheduleData.days.forEach(day => {
+    scheduleData.days.forEach((day, dayIndex) => {
         const weekendClass = day.isWeekend ? 'weekend' : '';
-        html += `<th class="${weekendClass}">In</th><th class="${weekendClass}">Out</th>`;
+        const closedClass = isDayClosed(dayIndex) ? 'day-closed' : '';
+        html += `<th class="${weekendClass} ${closedClass}">In</th><th class="${weekendClass} ${closedClass}">Out</th>`;
     });
     
     html += '<th class="hours-header"></th></tr>';
@@ -1752,20 +1761,23 @@ function renderSingleEmployeeRow(emp, section, empIndex) {
     emp.shifts.forEach((shift, dayIndex) => {
         const isWeekend = scheduleData.days[dayIndex].isWeekend;
         const weekendClass = isWeekend ? 'weekend' : '';
-        
+        const closed = isDayClosed(dayIndex);
+        const closedClass = closed ? 'day-closed' : '';
+        const roAttr = closed ? 'readonly tabindex="-1"' : '';
+
         const inVal = shift ? (shift.in === '-' ? '-' : formatTime(shift.in) || '') : '';
         const outVal = shift ? (shift.out === '-' ? '-' : formatTime(shift.out) || '') : '';
-        
-        html += `<td class="shift-cell ${weekendClass}" data-section="${section}" data-emp="${empIndex}" data-day="${dayIndex}" data-type="in">
-            <input type="text" class="shift-input" value="${inVal}" 
+
+        html += `<td class="shift-cell ${weekendClass} ${closedClass}" data-section="${section}" data-emp="${empIndex}" data-day="${dayIndex}" data-type="in">
+            <input type="text" class="shift-input" value="${inVal}" ${roAttr}
                    onchange="handleShiftInput(this, '${section}', ${empIndex}, ${dayIndex}, 'in')"
                    onclick="event.stopPropagation()"
                    placeholder="—">
-            <button class="shift-popup-btn" onclick="openShiftModal('${section}', ${empIndex}, ${dayIndex})" title="More options">⚙</button>
+            ${closed ? '' : `<button class="shift-popup-btn" onclick="openShiftModal('${section}', ${empIndex}, ${dayIndex})" title="More options">⚙</button>`}
         </td>`;
-        
-        html += `<td class="shift-cell ${weekendClass}" data-section="${section}" data-emp="${empIndex}" data-day="${dayIndex}" data-type="out">
-            <input type="text" class="shift-input" value="${outVal}"
+
+        html += `<td class="shift-cell ${weekendClass} ${closedClass}" data-section="${section}" data-emp="${empIndex}" data-day="${dayIndex}" data-type="out">
+            <input type="text" class="shift-input" value="${outVal}" ${roAttr}
                    onchange="handleShiftInput(this, '${section}', ${empIndex}, ${dayIndex}, 'out')"
                    onclick="event.stopPropagation()"
                    placeholder="—">
@@ -1795,7 +1807,7 @@ function renderOfficeHoursRow() {
         const weekendClass = isWeekend ? 'weekend' : '';
         
         if (hours.in === 'CLOSED') {
-            html += `<td colspan="2" class="${weekendClass}" onclick="openOfficeHoursModal(${dayIndex})">CLOSED</td>`;
+            html += `<td colspan="2" class="${weekendClass} day-closed" onclick="openOfficeHoursModal(${dayIndex})">CLOSED</td>`;
         } else {
             html += `<td class="shift-cell ${weekendClass}">
                 <input type="text" class="shift-input" value="${hours.in || ''}" 
@@ -1833,9 +1845,10 @@ function renderEventsRow() {
     scheduleData.events.forEach((events, dayIndex) => {
         const isWeekend = scheduleData.days[dayIndex].isWeekend;
         const weekendClass = isWeekend ? 'weekend' : '';
+        const closedClass = isDayClosed(dayIndex) ? 'day-closed' : '';
         const eventText = events && events.length > 0 ? events.join(', ') : '';
-        
-        html += `<td colspan="2" class="shift-cell ${weekendClass}">
+
+        html += `<td colspan="2" class="shift-cell ${weekendClass} ${closedClass}">
             <input type="text" class="shift-input event-input" value="${eventText}" 
                    onchange="handleEventInput(this, ${dayIndex})"
                    onclick="event.stopPropagation()">
