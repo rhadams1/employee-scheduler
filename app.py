@@ -1210,23 +1210,17 @@ def register_routes(app):
                 if m > 12:
                     m, y = 1, y + 1
 
-            pdf = FPDF(orientation='P', unit='mm', format='Letter')
+            pdf = FPDF(orientation='L', unit='mm', format='Letter')
             pdf.set_auto_page_break(auto=False)
 
             logo_path = os.path.join(app.static_folder, 'Ice_Line_Logo.png')
             has_logo = os.path.exists(logo_path)
 
-            page_w = 215.9      # Letter width (mm)
+            page_w = 279.4      # Letter landscape width (mm)
             margin = 10
             usable_w = page_w - 2 * margin
             col_w = usable_w / 7
             weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
-            def draw_checkbox(x, y, label, size=3.2):
-                pdf.rect(x, y, size, size)
-                pdf.set_xy(x + size + 1, y - 0.6)
-                pdf.set_font('Helvetica', '', 6.5)
-                pdf.cell(col_w / 2, size + 1.2, label, 0, 0, 'L')
 
             for (year, month) in month_list:
                 pdf.add_page()
@@ -1251,28 +1245,21 @@ def register_routes(app):
                 # Instructions box
                 pdf.ln(1)
                 instr_x, instr_y = margin, pdf.get_y()
-                instr_h = 25
+                instr_h = 19
                 pdf.set_fill_color(238, 242, 248)
                 pdf.set_draw_color(150, 150, 150)
                 pdf.rect(instr_x, instr_y, usable_w, instr_h, 'DF')
                 pdf.set_xy(instr_x + 2, instr_y + 1.5)
                 pdf.set_font('Helvetica', 'B', 9)
-                pdf.cell(0, 4.5, 'On each day you need off, mark one:', 0, 1, 'L')
+                pdf.cell(0, 4.5, 'How to request time off:', 0, 1, 'L')
                 pdf.set_font('Helvetica', '', 8.5)
-                bullets = [
-                    ('All Day', 'check this box for the whole day off'),
-                    ('AM  or  PM', 'check one for just the morning or just the afternoon/evening'),
-                    ('Line at the bottom', 'write exact hours if needed (e.g. "off after 2:00")'),
-                ]
-                for label, desc in bullets:
+                for line in [
+                    'In the box for any day you need off, write what you need - e.g. "All day", "AM only", or "Off after 2:00".',
+                    'Fill in your name and the date at the top of this sheet.',
+                    'Return the completed sheet to the office by the posted deadline.',
+                ]:
                     pdf.set_x(instr_x + 4)
-                    pdf.set_font('Helvetica', 'B', 8.5)
-                    pdf.cell(34, 4, f"-  {label}", 0, 0, 'L')
-                    pdf.set_font('Helvetica', '', 8.5)
-                    pdf.cell(0, 4, desc, 0, 1, 'L')
-                pdf.set_x(instr_x + 2)
-                pdf.set_font('Helvetica', 'I', 8)
-                pdf.cell(0, 4, 'Return this sheet to the office by the posted deadline.', 0, 1, 'L')
+                    pdf.cell(0, 4.2, f"-  {line}", 0, 1, 'L')
                 pdf.set_draw_color(0, 0, 0)
 
                 # ---- Calendar grid ----
@@ -1281,7 +1268,7 @@ def register_routes(app):
                 wd_header_h = 6
 
                 weeks = cal.Calendar(firstweekday=6).monthdayscalendar(year, month)
-                page_h = 279.4  # Letter height (mm)
+                page_h = 215.9  # Letter landscape height (mm)
                 grid_h = page_h - grid_top - bottom_margin
                 row_h = (grid_h - wd_header_h) / len(weeks)
 
@@ -1305,20 +1292,10 @@ def register_routes(app):
                             pdf.set_fill_color(255, 255, 255)
                             continue
                         pdf.rect(cell_x, cell_y, col_w, row_h)
-                        # Day number
+                        # Day number only — the rest of the cell is left blank to write in
                         pdf.set_xy(cell_x + 1, cell_y + 0.8)
                         pdf.set_font('Helvetica', 'B', 11)
                         pdf.cell(col_w - 2, 5, str(daynum), 0, 0, 'L')
-                        # Checkboxes
-                        cb_y = cell_y + 8
-                        draw_checkbox(cell_x + 2, cb_y, 'AM')
-                        draw_checkbox(cell_x + col_w / 2 + 1, cb_y, 'PM')
-                        draw_checkbox(cell_x + 2, cb_y + 6, 'All Day')
-                        # Write-in line for specific times
-                        line_y = cell_y + row_h - 3.5
-                        pdf.set_draw_color(180, 180, 180)
-                        pdf.line(cell_x + 2, line_y, cell_x + col_w - 2, line_y)
-                        pdf.set_draw_color(0, 0, 0)
 
             filename = (
                 f"timeoff_{cal.month_abbr[month_list[0][1]]}-"
