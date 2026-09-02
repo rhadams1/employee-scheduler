@@ -559,12 +559,9 @@ def build_schedule_pdf_chromium(week_start, base_url, timeout_ms):
     """
     from playwright.sync_api import sync_playwright
 
-    # A4 landscape printable area in inches, minus 0.25in margins.
-    # landscape=True (set on page.pdf below) rotates A4, so the long edge
-    # (11.69in) is the width and the short edge (8.27in) is the height.
-    margin_in = 0.25
-    page_w_in = 11.69 - 2 * margin_in
-    page_h_in = 8.27 - 2 * margin_in
+    # Chrome's "Default" print margin (~0.4in). landscape=True (set on
+    # page.pdf below) rotates A4 so the long edge is the width.
+    margin_in = 0.4
     url = f"{base_url}/?print=1&week={week_start}"
 
     with sync_playwright() as p:
@@ -579,23 +576,13 @@ def build_schedule_pdf_chromium(week_start, base_url, timeout_ms):
             page.goto(url, timeout=timeout_ms)
             page.wait_for_function('window.__printReady === true', timeout=timeout_ms)
 
-            # Measure full rendered content at scale 1 (CSS px @ 96dpi).
-            metrics = page.evaluate(
-                "() => ({ w: document.documentElement.scrollWidth,"
-                " h: document.documentElement.scrollHeight })"
-            )
-            if not metrics['w'] or not metrics['h']:
-                raise RuntimeError(f"Print page reported zero dimensions: {metrics}")
-            content_w_in = metrics['w'] / 96.0
-            content_h_in = metrics['h'] / 96.0
-
-            scale = min(page_w_in / content_w_in, page_h_in / content_h_in, 1.0)
-            scale = max(scale, 0.1)  # Playwright clamps to [0.1, 2.0].
-
+            # Print at 100% with Chrome's "Default" margins, exactly like the
+            # browser's native Save-as-PDF (which is the look Bob prefers).
+            # Chromium lays the page out at the paper width on its own, so no
+            # manual scale factor is needed — that only distorted the sizing.
             pdf_bytes = page.pdf(
                 format='A4',
                 landscape=True,
-                scale=scale,
                 print_background=True,
                 margin={
                     'top': f'{margin_in}in', 'bottom': f'{margin_in}in',
