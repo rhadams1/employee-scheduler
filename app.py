@@ -576,13 +576,13 @@ def build_schedule_pdf_chromium(week_start, base_url, timeout_ms):
             page.goto(url, timeout=timeout_ms)
             page.wait_for_function('window.__printReady === true', timeout=timeout_ms)
 
-            # Print at 100% with Chrome's "Default" margins, exactly like the
-            # browser's native Save-as-PDF (which is the look Bob prefers).
-            # Chromium lays the page out at the paper width on its own, so no
-            # manual scale factor is needed — that only distorted the sizing.
+            # Chrome's "Default" margins + 80% scale, matching how Bob used to
+            # print it by hand (File > Print, scale set to 80%). Chromium lays the
+            # page out at the paper width; scale=0.8 shrinks it to 80% like the dialog.
             pdf_bytes = page.pdf(
                 format='A4',
                 landscape=True,
+                scale=0.8,
                 print_background=True,
                 margin={
                     'top': f'{margin_in}in', 'bottom': f'{margin_in}in',
