@@ -1772,7 +1772,7 @@ function renderSingleEmployeeRow(emp, section, empIndex) {
             <input type="text" class="shift-input" value="${inVal}" ${roAttr}
                    onchange="handleShiftInput(this, '${section}', ${empIndex}, ${dayIndex}, 'in')"
                    onclick="event.stopPropagation()"
-                   placeholder="—">
+                   placeholder="-">
             ${closed ? '' : `<button class="shift-popup-btn" onclick="openShiftModal('${section}', ${empIndex}, ${dayIndex})" title="More options">⚙</button>`}
         </td>`;
 
@@ -1780,7 +1780,7 @@ function renderSingleEmployeeRow(emp, section, empIndex) {
             <input type="text" class="shift-input" value="${outVal}" ${roAttr}
                    onchange="handleShiftInput(this, '${section}', ${empIndex}, ${dayIndex}, 'out')"
                    onclick="event.stopPropagation()"
-                   placeholder="—">
+                   placeholder="-">
         </td>`;
     });
     
@@ -1813,14 +1813,14 @@ function renderOfficeHoursRow() {
                 <input type="text" class="shift-input" value="${hours.in || ''}" 
                        onchange="handleOfficeHoursInput(this, ${dayIndex}, 'in')"
                        onclick="event.stopPropagation()"
-                       placeholder="—">
+                       placeholder="-">
                 <button class="shift-popup-btn" onclick="openOfficeHoursModal(${dayIndex})" title="More options">⚙</button>
             </td>`;
             html += `<td class="shift-cell ${weekendClass}">
                 <input type="text" class="shift-input" value="${hours.out || ''}" 
                        onchange="handleOfficeHoursInput(this, ${dayIndex}, 'out')"
                        onclick="event.stopPropagation()"
-                       placeholder="—">
+                       placeholder="-">
             </td>`;
         }
     });
