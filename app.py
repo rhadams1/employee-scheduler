@@ -438,7 +438,7 @@ def build_schedule_pdf_fpdf(data):
 
     Fallback generator used when headless Chromium is unavailable.
     """
-    pdf = FPDF(orientation='L', unit='mm', format='A4')
+    pdf = FPDF(orientation='L', unit='mm', format='Letter')
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=10)
 
@@ -580,7 +580,7 @@ def build_schedule_pdf_chromium(week_start, base_url, timeout_ms):
             # print it by hand (File > Print, scale set to 80%). Chromium lays the
             # page out at the paper width; scale=0.8 shrinks it to 80% like the dialog.
             pdf_bytes = page.pdf(
-                format='A4',
+                format='Letter',
                 landscape=True,
                 scale=0.8,
                 print_background=True,
